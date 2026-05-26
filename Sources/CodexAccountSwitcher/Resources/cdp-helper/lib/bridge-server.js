@@ -8,6 +8,7 @@ const fsp = require("node:fs/promises");
 
 const { createAccountService } = require("../../runtime/account-service");
 const {
+  chooseDebugPortForLaunch,
   cdpStatus,
   ensureCodexLaunched,
   injectRenderers,
@@ -49,6 +50,11 @@ async function serveBridge(options) {
     launching = true;
     try {
       closeSessions();
+      const nextDebugPort = await chooseDebugPortForLaunch(options.debugPort);
+      if (nextDebugPort !== options.debugPort) {
+        log(`debug port ${options.debugPort} unavailable; switching to ${nextDebugPort}`);
+        options.debugPort = nextDebugPort;
+      }
       if (launchOptions.forceRelaunch || launchOptions.clearBrowserSession) {
         await quitCodex();
       }

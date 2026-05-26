@@ -340,6 +340,15 @@ async function ensureCodexLaunched(codexApp, debugPort) {
   throw lastError || new Error(`Timed out waiting for Codex CDP target on port ${debugPort}.`);
 }
 
+async function chooseDebugPortForLaunch(preferredPort) {
+  try {
+    const status = await cdpStatus(preferredPort);
+    if (status.hasCodexTarget) return preferredPort;
+  } catch {}
+  if (await portIsAvailable(preferredPort)) return preferredPort;
+  return findAvailablePort(preferredPort + 1);
+}
+
 async function queryBridge(bridgePort, pathname = "/status", method = "GET") {
   const response = await fetch(`http://127.0.0.1:${bridgePort}${pathname}`, {
     method,
@@ -449,6 +458,7 @@ module.exports = {
   listTargets,
   isDebugPortReady,
   cdpStatus,
+  chooseDebugPortForLaunch,
   pickCodexTarget,
   rendererInjectionSource,
   injectRenderer,

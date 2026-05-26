@@ -19,6 +19,7 @@ const {
   codexLaunchArgs,
   codexMainProcessIds,
   codexPageTargets,
+  chooseDebugPortForLaunch,
   findAvailablePort,
   pickCodexTarget,
   portIsAvailable,
@@ -227,6 +228,23 @@ test("CDP debug port selection skips occupied ports", async () => {
     const occupied = server.address().port;
     assert.equal(await portIsAvailable(occupied), false);
     assert.notEqual(await findAvailablePort(occupied), occupied);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("CDP launch port selection skips non-Codex listeners", async () => {
+  const http = require("node:http");
+  const server = http.createServer((request, response) => {
+    response.writeHead(404, { "Content-Type": "text/plain" });
+    response.end("not Codex CDP");
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const occupied = server.address().port;
+    const selected = await chooseDebugPortForLaunch(occupied);
+    assert.notEqual(selected, occupied);
+    assert.equal(await portIsAvailable(selected), true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
