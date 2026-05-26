@@ -1,0 +1,10 @@
+{
+  "name": "codex-account-switcher-helper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node --check Sources/CodexAccountSwitcher/Resources/cdp-helper/cli.js && node --check Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp.js && node --check Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/bridge-server.js && node --check Sources/CodexAccountSwitcher/Resources/cdp-helper/renderer-inject.js && node --check Sources/CodexAccountSwitcher/Resources/runtime/account-service.js"
+  }
+}

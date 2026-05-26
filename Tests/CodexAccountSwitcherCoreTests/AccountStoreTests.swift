@@ -1,0 +1,119 @@
+import XCTest
+@testable import CodexAccountSwitcherCore
+
+final class AccountStoreTests: XCTestCase {
+    func testAccountNameValidationAcceptsSafeNamesAndRejectsUnsafeNames() throws {
+        XCTAssertEqual(try AccountName.normalize("work.main-2"), "work.main-2")
+        XCTAssertEqual(try AccountName.normalize("personal_json.json"), "personal_json")
+
+        XCTAssertThrowsError(try AccountName.normalize("../escape"))
+        XCTAssertThrowsError(try AccountName.normalize("-starts-with-dash"))
+        XCTAssertThrowsError(try AccountName.normalize("has space"))
+        XCTAssertThrowsError(try AccountName.normalize(""))
+    }
+
+    func testEmailExtractionReadsDirectFieldsAndJWTIdToken() throws {
+        XCTAssertEqual(AuthEmailExtractor.email(from: #"{"email":"direct@example.com"}"#), "direct@example.com")
+        XCTAssertEqual(AuthEmailExtractor.email(from: #"{"user":{"email":"user@example.com"}}"#), "user@example.com")
+        XCTAssertEqual(AuthEmailExtractor.email(from: #"{"account":{"email":"account@example.com"}}"#), "account@example.com")
+
+        let token = makeJWT(email: "jwt@example.com")
+        XCTAssertEqual(
+            AuthEmailExtractor.email(from: #"{"tokens":{"id_token":"\#(token)"}}"#),
+            "jwt@example.com"
+        )
+    }
+
+    func testSaveSwitchDeleteAndAutosaveUseCodexAccountFiles() throws {
+        try withTemporaryHome { home in
+            let store = AccountStore(homeDirectory: home)
+            try store.fileManager.createDirectory(at: store.codexDirectory, withIntermediateDirectories: true)
+            let workAuth = auth(email: "work@example.com", profile: "work")
+            let personalAuth = auth(email: "me@example.com", profile: "personal")
+            try workAuth.write(to: store.authPath, atomically: true, encoding: .utf8)
+
+            let saved = try store.saveCurrentAccount(named: "work")
+            XCTAssertEqual(saved.current, "work")
+            XCTAssertEqual(try String(contentsOf: store.accountPath("work"), encoding: .utf8), workAuth)
+
+            try personalAuth.write(to: store.authPath, atomically: true, encoding: .utf8)
+            let autosaved = try store.readState()
+            XCTAssertEqual(autosaved.current, "account")
+            XCTAssertTrue(store.fileManager.fileExists(atPath: store.accountPath("account").path))
+
+            let switched = try store.switchToAccount(named: "work")
+            XCTAssertEqual(switched.current, "work")
+            XCTAssertEqual(try String(contentsOf: store.authPath, encoding: .utf8), workAuth)
+
+            let deleted = try store.deleteAccount(named: "work")
+            XCTAssertNil(deleted.current)
+            XCTAssertFalse(store.fileManager.fileExists(atPath: store.accountPath("work").path))
+        }
+    }
+
+    func testDuplicateEmailsPreferActiveSnapshotThenNewestSnapshot() throws {
+        try withTemporaryHome { home in
+            let store = AccountStore(homeDirectory: home)
+            try store.fileManager.createDirectory(at: store.accountsDirectory, withIntermediateDirectories: true)
+            let oldAuth = auth(email: "work@example.com", profile: "old")
+            let activeAuth = auth(email: "work@example.com", profile: "active")
+            let otherAuth = auth(email: "other@example.com", profile: "other")
+            try oldAuth.write(to: store.accountPath("work-old"), atomically: true, encoding: .utf8)
+            try activeAuth.write(to: store.accountPath("work-current"), atomically: true, encoding: .utf8)
+            try otherAuth.write(to: store.accountPath("other"), atomically: true, encoding: .utf8)
+            try activeAuth.write(to: store.authPath, atomically: true, encoding: .utf8)
+            try store.fileManager.setAttributes([.modificationDate: Date(timeIntervalSince1970: 10)], ofItemAtPath: store.accountPath("work-old").path)
+            try store.fileManager.setAttributes([.modificationDate: Date(timeIntervalSince1970: 5)], ofItemAtPath: store.accountPath("work-current").path)
+
+            var state = try store.readState()
+            XCTAssertEqual(state.accounts.map(\.name), ["other", "work-current"])
+            XCTAssertEqual(state.current, "work-current")
+
+            try store.fileManager.removeItem(at: store.authPath)
+            try store.fileManager.setAttributes([.modificationDate: Date(timeIntervalSince1970: 30)], ofItemAtPath: store.accountPath("work-old").path)
+            state = try store.readState()
+            XCTAssertEqual(state.accounts.map(\.name), ["other", "work-old"])
+        }
+    }
+
+    func testHelperCommandResultRequiresSuccessBeforeShowingDone() throws {
+        let result = HelperCommandResult(
+            ok: false,
+            status: nil,
+            state: nil,
+            error: HelperErrorPayload(message: "Use Launch + Inject first.", code: nil),
+            rawOutput: nil
+        )
+
+        XCTAssertThrowsError(try result.requireSuccess()) { error in
+            XCTAssertEqual(error.localizedDescription, "Use Launch + Inject first.")
+        }
+    }
+}
+
+private func withTemporaryHome(_ body: (URL) throws -> Void) throws {
+    let root = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("codex-switcher-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try body(root)
+}
+
+private func auth(email: String, profile: String) -> String {
+    #"{"auth_mode":"chatgpt","profile_id":"\#(profile)","email":"\#(email)","tokens":{"access_token":"access","refresh_token":"refresh"}}"#
+}
+
+private func makeJWT(email: String) -> String {
+    let header = #"{"alg":"none","typ":"JWT"}"#.data(using: .utf8)!.base64URLEncodedString()
+    let payload = #"{"email":"\#(email)"}"#.data(using: .utf8)!.base64URLEncodedString()
+    return "\(header).\(payload)."
+}
+
+private extension Data {
+    func base64URLEncodedString() -> String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
