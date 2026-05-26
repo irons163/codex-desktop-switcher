@@ -16,6 +16,8 @@ const {
 } = require("../Sources/CodexAccountSwitcher/Resources/runtime/account-service");
 const {
   codexDebugArgs,
+  codexLaunchArgs,
+  codexMainProcessIds,
   codexPageTargets,
   findAvailablePort,
   pickCodexTarget,
@@ -77,6 +79,24 @@ test("account service saves, switches, deletes, and reports state", async () => 
     result = await service.handle({ action: "delete", name: "work" });
     assert.equal(result.ok, true);
     assert.deepEqual(result.state.accounts, ["account"]);
+  });
+});
+
+test("account service switch requests a real Codex restart by default", async () => {
+  await withTempHome(async (home) => {
+    const relaunches = [];
+    const service = createAccountService({ home, relaunch: (options) => { relaunches.push(options); } });
+    const codexDir = path.join(home, ".codex");
+    const accountsDir = path.join(codexDir, "auth_accounts");
+    await fs.mkdir(accountsDir, { recursive: true });
+    await fs.writeFile(path.join(accountsDir, "work.json"), auth("work@example.com", "work"));
+
+    const result = await service.handle({ action: "switch", name: "work" });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.state.requiresAppRelaunch, true);
+    assert.deepEqual(relaunches, [{ forceRelaunch: true }]);
   });
 });
 
@@ -319,6 +339,29 @@ test("Codex process detector recognizes macOS app executable commands", () => {
   );
 });
 
+test("Codex process detector returns every main process id", () => {
+  const output = [
+    "81147     1 /Applications/Codex.app/Contents/MacOS/Codex --remote-debugging-port=57330",
+    "82910     1 /Applications/Codex.app/Contents/MacOS/Codex --remote-debugging-port=57331",
+    "82921 82910 /Applications/Codex.app/Contents/Frameworks/Codex Helper.app/Contents/MacOS/Codex Helper --type=renderer",
+  ].join("\n");
+
+  assert.deepEqual(codexMainProcessIds(output), [81147, 82910]);
+});
+
+test("Codex launcher does not force a new application instance", () => {
+  const args = codexLaunchArgs("/Applications/Codex.app", 57330);
+
+  assert.equal(args.includes("-n"), false);
+  assert.equal(args.includes("-na"), false);
+  assert.deepEqual(args, [
+    "/Applications/Codex.app",
+    "--args",
+    "--remote-debugging-port=57330",
+    "--remote-allow-origins=http://127.0.0.1:57330",
+  ]);
+});
+
 test("renderer injection uses CDP binding bridge instead of Electron preload APIs", () => {
   const source = rendererInjectionSource();
 
@@ -368,6 +411,13 @@ test("renderer account popup exposes save and new sign-in actions directly", () 
   assert.match(source, /menuButton\(t\("newSignIn"\)/);
 });
 
+test("renderer account popup reports async action failures instead of swallowing them", () => {
+  const source = rendererInjectionSource();
+
+  assert.match(source, /Promise\.resolve\(action\(\)\)/);
+  assert.match(source, /Account Switcher.*menu action failed/);
+});
+
 test("renderer starts Codex native ChatGPT login after preparing a new account", () => {
   const source = rendererInjectionSource();
 
@@ -379,6 +429,15 @@ test("renderer starts Codex native ChatGPT login after preparing a new account",
   assert.match(source, /AbortController/);
   assert.match(source, /useStreamlinedLogin:\s*false/);
   assert.match(source, /relaunch:\s*false/);
+});
+
+test("renderer switch uses a real Codex relaunch because hot auth refresh is not reliable", () => {
+  const source = rendererInjectionSource();
+
+  assert.match(source, /action: "switch", name, relaunch: true/);
+  assert.doesNotMatch(source, /account\/login\/start/);
+  assert.doesNotMatch(source, /chatgptAuthTokens/);
+  assert.doesNotMatch(source, /softRefresh:\s*true/);
 });
 
 test("renderer gets a native login URL before clearing the active auth file", () => {

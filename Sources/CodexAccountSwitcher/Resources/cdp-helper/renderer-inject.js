@@ -44,6 +44,8 @@
       accountName: "帳號名稱",
       saveDone: "已儲存",
       deleteDone: "已刪除",
+      switchDone: "已切換",
+      relaunching: "正在重新啟動 Codex...",
       nativeLoginUnavailable: "找不到 Codex 原生登入流程，請更新後重新注入",
       missingAuthUrl: "Codex 登入流程沒有回傳登入網址，請重新啟動 Codex 後再試",
       loginAlreadyInProgress: "Codex 已有一個登入流程卡住，請重啟 Codex 後再按新增登入",
@@ -74,6 +76,8 @@
       accountName: "Account name",
       saveDone: "Saved",
       deleteDone: "Deleted",
+      switchDone: "Switched",
+      relaunching: "Relaunching Codex...",
       nativeLoginUnavailable: "Codex native sign-in flow was not found. Update and inject again.",
       missingAuthUrl: "Codex sign-in did not return a login URL. Restart Codex and try again.",
       loginAlreadyInProgress: "Codex already has a stuck sign-in flow. Restart Codex, then use New sign-in again.",
@@ -182,6 +186,12 @@
     const loginModule = await import(moduleUrl);
     if (typeof loginModule.r !== "function") throw new Error(t("nativeLoginUnavailable"));
     return loginModule.r;
+  }
+
+  async function switchSavedAccount(name) {
+    const result = await invoke({ action: "switch", name, relaunch: true });
+    if (!result.ok) throw new Error(result.error?.message || "Switch failed");
+    return result;
   }
 
   async function openNativeLoginAuthUrl(loginResult) {
@@ -396,7 +406,14 @@
     item.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      action();
+      item.disabled = true;
+      Promise.resolve(action()).catch((error) => {
+        console.warn("[Codex Account Switcher] menu action failed", error);
+        item.textContent = error?.message || String(error);
+        item.style.color = "#ff6b6b";
+      }).finally(() => {
+        if (item.isConnected) item.disabled = false;
+      });
     });
     return item;
   }
@@ -428,7 +445,9 @@
       const label = `${state.accountEmails[name] || name}${state.current === name ? ` (${t("current")})` : ""}`;
       panel.appendChild(menuButton(label, async () => {
         panel.textContent = t("switching");
-        await invoke({ action: "switch", name, relaunch: true });
+        const switchResult = await switchSavedAccount(name);
+        if (switchResult.state?.requiresAppRelaunch) panel.textContent = t("relaunching");
+        else await renderPanel(panel);
       }));
     }
     panel.appendChild(menuButton(t("save"), async () => {
@@ -925,9 +944,9 @@
       if (command === "switch") {
         const name = target.getAttribute(commandAccountAttribute) || "";
         setStatus(page, t("switching"));
-        const result = await invoke({ action: "switch", name, relaunch: true });
-        if (!result.ok) throw new Error(result.error?.message || "Switch failed");
+        const result = await switchSavedAccount(name);
         renderAccountsState(page, result.state);
+        setStatus(page, result.state?.requiresAppRelaunch ? t("relaunching") : t("switchDone"));
         return;
       }
       if (command === "delete") {

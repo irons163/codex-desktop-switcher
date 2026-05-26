@@ -49,8 +49,10 @@ async function serveBridge(options) {
     launching = true;
     try {
       closeSessions();
-      if (launchOptions.clearBrowserSession) {
+      if (launchOptions.forceRelaunch || launchOptions.clearBrowserSession) {
         await quitCodex();
+      }
+      if (launchOptions.clearBrowserSession) {
         await clearCodexBrowserLoginState(os.homedir(), log);
       }
       await ensureCodexLaunched(options.codexApp, options.debugPort);

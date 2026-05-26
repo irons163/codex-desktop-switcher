@@ -23,9 +23,10 @@ function createAccountService(options = {}) {
         if (action === "state") return ok({ state: await readState(paths) });
         if (action === "save") return ok({ state: await saveCurrentAccount(paths, message.name) });
         if (action === "switch") {
+          const shouldRelaunch = message.relaunch !== false;
           const state = await switchAccount(paths, message.name);
-          if (message.relaunch !== false) setTimeout(relaunch, 250);
-          return ok({ state: { ...state, requiresAppRelaunch: true } });
+          if (shouldRelaunch) setTimeout(() => relaunch({ forceRelaunch: true }), 250);
+          return ok({ state: { ...state, requiresAppRelaunch: shouldRelaunch } });
         }
         if (action === "delete") return ok({ state: await deleteAccount(paths, message.name) });
         if (action === "start-login") {
@@ -102,8 +103,9 @@ async function switchAccount(paths, rawName) {
   const name = normalizeAccountName(rawName);
   const source = accountPath(paths, name);
   if (!(await pathExists(source))) throw new Error(`Saved account not found: ${name}`);
+  const authJson = await fsp.readFile(source, "utf8");
   await fsp.mkdir(paths.CODEX_DIR, { recursive: true });
-  await fsp.copyFile(source, paths.AUTH_PATH);
+  await fsp.writeFile(paths.AUTH_PATH, authJson, "utf8");
   await fsp.writeFile(paths.CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return readState(paths);
 }
@@ -404,12 +406,18 @@ function emailFromAuth(auth) {
   const direct = auth?.email || auth?.user?.email || auth?.account?.email;
   if (typeof direct === "string" && direct.includes("@")) return direct;
   const idToken = auth?.tokens?.id_token;
-  if (typeof idToken !== "string") return null;
-  const [, payload] = idToken.split(".");
+  const claims = jwtPayload(idToken);
+  const nestedEmail = claims?.["https://api.openai.com/profile"]?.email;
+  if (typeof nestedEmail === "string" && nestedEmail.includes("@")) return nestedEmail;
+  return typeof claims?.email === "string" && claims.email.includes("@") ? claims.email : null;
+}
+
+function jwtPayload(token) {
+  if (typeof token !== "string") return null;
+  const [, payload] = token.split(".");
   if (!payload) return null;
   try {
-    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    return typeof claims.email === "string" && claims.email.includes("@") ? claims.email : null;
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
   } catch {
     return null;
   }
