@@ -41,3 +41,24 @@ test("account service finds Codex lazy asset chunks from the app asar header", a
     assert.equal(result.asset.fileName, "onboarding-login-content-Bf2QVA6e.js");
   });
 });
+
+test("asar asset lookup rejects unsafe prefixes", async () => {
+  await assert.rejects(
+    () => findCodexAssetByPrefix("/Applications/Codex.app", "../secret"),
+    /Asset prefix is required/,
+  );
+});
+
+test("asar asset lookup reports an invalid header size", async () => {
+  await withTempHome(async (home) => {
+    const codexApp = path.join(home, "Codex.app");
+    const asarPath = path.join(codexApp, "Contents", "Resources", "app.asar");
+    await fs.mkdir(path.dirname(asarPath), { recursive: true });
+    await fs.writeFile(asarPath, Buffer.alloc(16));
+
+    await assert.rejects(
+      () => findCodexAssetByPrefix(codexApp, "index-"),
+      /Invalid asar header size/,
+    );
+  });
+});

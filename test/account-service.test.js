@@ -135,3 +135,48 @@ test("helper status emits JSON error for missing Codex app", () => {
   assert.equal(payload.ok, false);
   assert.match(payload.error.message, /Codex\.app not found/);
 });
+
+test("account state only reports usage for visible saved accounts", async () => {
+  await withTempHome(async (home) => {
+    const service = createAccountService({ home });
+    const codexDir = path.join(home, ".codex");
+    const accountsDir = path.join(codexDir, "auth_accounts");
+    await fs.mkdir(accountsDir, { recursive: true });
+    const activeAuth = auth("work@example.com", "work");
+    await fs.writeFile(path.join(codexDir, "auth.json"), activeAuth);
+    await fs.writeFile(path.join(accountsDir, "work.json"), activeAuth);
+    await fs.writeFile(path.join(accountsDir, "hidden.json"), auth("work@example.com", "hidden"));
+    await fs.writeFile(path.join(codexDir, "auth_accounts_usage.json"), JSON.stringify({
+      work: { remaining: 42 },
+      hidden: { remaining: 17 },
+      deleted: { remaining: 99 },
+    }));
+
+    const result = await service.handle({ action: "state" });
+
+    assert.deepEqual(result.state.accounts, ["work"]);
+    assert.deepEqual(result.state.accountUsage, { work: { remaining: 42 } });
+  });
+});
+
+test("clear-active backs up auth before removing the active marker", async () => {
+  await withTempHome(async (home) => {
+    const service = createAccountService({ home });
+    const codexDir = path.join(home, ".codex");
+    await fs.mkdir(codexDir, { recursive: true });
+    const originalAuth = auth("work@example.com", "work");
+    await fs.writeFile(path.join(codexDir, "auth.json"), originalAuth);
+    await fs.writeFile(path.join(codexDir, "current_account"), "work\n");
+
+    const result = await service.handle({ action: "clear-active", relaunch: false });
+    const files = await fs.readdir(codexDir);
+    const backupFiles = files.filter((name) => name.startsWith("auth.account-switcher-backup-"));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.state.hasActiveAuth, false);
+    assert.equal(backupFiles.length, 1);
+    assert.equal(await fs.readFile(path.join(codexDir, backupFiles[0]), "utf8"), originalAuth);
+    await assert.rejects(() => fs.access(path.join(codexDir, "auth.json")), { code: "ENOENT" });
+    await assert.rejects(() => fs.access(path.join(codexDir, "current_account")), { code: "ENOENT" });
+  });
+});
