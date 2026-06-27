@@ -8,8 +8,6 @@ const path = require("node:path");
 const { close, listen } = require("./support/fixtures");
 const {
   codexDebugArgs,
-  codexLaunchArgs,
-  codexMainProcessIds,
   codexProcessListHasMainCommand,
   chooseDebugPortForLaunch,
   findAvailablePort,
@@ -17,6 +15,8 @@ const {
   portIsAvailable,
   queryBridge,
 } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp");
+const { codexLaunchArgs: directCodexLaunchArgs } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp/launcher");
+const { codexMainProcessIds: directCodexMainProcessIds } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp/processes");
 
 test("CDP launcher args enable local browser debugging without app patching", () => {
   assert.deepEqual(codexDebugArgs(57321), [
@@ -102,11 +102,11 @@ test("Codex process detector returns every main process id", () => {
     "82921 82910 /Applications/Codex.app/Contents/Frameworks/Codex Helper.app/Contents/MacOS/Codex Helper --type=renderer",
   ].join("\n");
 
-  assert.deepEqual(codexMainProcessIds(output), [81147, 82910]);
+  assert.deepEqual(directCodexMainProcessIds(output), [81147, 82910]);
 });
 
 test("Codex launcher does not force a new application instance", () => {
-  const args = codexLaunchArgs("/Applications/Codex.app", 57330);
+  const args = directCodexLaunchArgs("/Applications/Codex.app", 57330);
 
   assert.equal(args.includes("-n"), false);
   assert.equal(args.includes("-na"), false);
@@ -120,7 +120,7 @@ test("Codex launcher does not force a new application instance", () => {
 
 test("CDP injection refreshes the renderer binding and allows runtime eval under CSP", () => {
   const source = fsSync.readFileSync(
-    path.join(__dirname, "..", "Sources", "CodexAccountSwitcher", "Resources", "cdp-helper", "lib", "cdp.js"),
+    path.join(__dirname, "..", "Sources", "CodexAccountSwitcher", "Resources", "cdp-helper", "lib", "cdp", "inject.js"),
     "utf8",
   );
 

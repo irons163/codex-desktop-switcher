@@ -3,11 +3,11 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   codexPageTargets,
-  pickCodexTarget,
 } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp");
+const { pickCodexTarget: directPickCodexTarget } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp/targets");
 
 test("CDP target picker prefers Codex renderer pages", () => {
-  const target = pickCodexTarget([
+  const target = directPickCodexTarget([
     { id: "one", type: "page", title: "Other", url: "app://-/index.html", webSocketDebuggerUrl: "ws://one" },
     { id: "two", type: "page", title: "Codex", url: "app://-/index.html", webSocketDebuggerUrl: "ws://two" },
   ]);
@@ -16,7 +16,7 @@ test("CDP target picker prefers Codex renderer pages", () => {
 });
 
 test("CDP target picker prefers the main Codex page over avatar overlay", () => {
-  const target = pickCodexTarget([
+  const target = directPickCodexTarget([
     { id: "overlay", type: "page", title: "Codex", url: "app://-/index.html?initialRoute=%2Favatar-overlay", webSocketDebuggerUrl: "ws://overlay" },
     { id: "main", type: "page", title: "Codex", url: "app://-/index.html", webSocketDebuggerUrl: "ws://main" },
   ]);
