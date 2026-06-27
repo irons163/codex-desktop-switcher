@@ -40,12 +40,14 @@ test("bridge state closes sessions and tracks a debug port change", () => {
   const closed = [];
   const state = createBridgeState(57330);
   state.sessions.set("main", { closed: false, close: () => closed.push("main") });
+  state.sessions.set("closed", { closed: true, close: () => closed.push("closed") });
   state.setDebugPort(57331);
   const options = state.runtimeOptions({ codexApp: "/Applications/Codex.app", debugPort: 57330 });
+  assert.equal(state.activeSessionCount(), 1);
   state.closeSessions();
 
   assert.equal(state.debugPort, 57331);
   assert.equal(options.debugPort, 57331);
-  assert.deepEqual(closed, ["main"]);
+  assert.deepEqual(closed, ["main", "closed"]);
   assert.equal(state.sessions.size, 0);
 });

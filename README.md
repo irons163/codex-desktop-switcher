@@ -33,6 +33,10 @@ npm run check
 .build/debug/CodexAccountSwitcher --status-json
 ```
 
+Node tests are grouped by account runtime, asar assets, CDP targets and launch,
+bridge behavior, renderer source guardrails, and public export compatibility.
+Run one suite directly with `node --test test/<suite>.test.js`.
+
 To produce a double-clickable app bundle:
 
 ```sh
