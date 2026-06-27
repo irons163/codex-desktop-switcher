@@ -33,3 +33,19 @@ test("bridge clears Codex browser login state for fresh account login", async ()
     await assert.rejects(() => fs.access(path.join(paths.userDataDir, "Session Storage")));
   });
 });
+
+const { createBridgeState } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/bridge/state");
+
+test("bridge state closes sessions and tracks a debug port change", () => {
+  const closed = [];
+  const state = createBridgeState(57330);
+  state.sessions.set("main", { closed: false, close: () => closed.push("main") });
+  state.setDebugPort(57331);
+  const options = state.runtimeOptions({ codexApp: "/Applications/Codex.app", debugPort: 57330 });
+  state.closeSessions();
+
+  assert.equal(state.debugPort, 57331);
+  assert.equal(options.debugPort, 57331);
+  assert.deepEqual(closed, ["main"]);
+  assert.equal(state.sessions.size, 0);
+});
