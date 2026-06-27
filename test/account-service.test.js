@@ -11,6 +11,8 @@ const {
   createAccountService,
   openAccountChooserURL,
 } = require("../Sources/CodexAccountSwitcher/Resources/runtime/account-service");
+const { emailFromAuthString: directEmailFromAuthString } = require("../Sources/CodexAccountSwitcher/Resources/runtime/auth-email");
+const { accountChooserURL: directAccountChooserURL } = require("../Sources/CodexAccountSwitcher/Resources/runtime/login-url");
 
 test("account service saves, switches, deletes, and reports state", async () => {
   await withTempHome(async (home) => {
@@ -85,6 +87,11 @@ test("account login URL forces fresh auth without unsupported prompt values", ()
   assert.equal(url.searchParams.get("state"), "abc");
   assert.equal(url.searchParams.has("prompt"), false);
   assert.equal(url.searchParams.get("max_age"), "0");
+});
+
+test("runtime modules expose auth email and login URL behavior directly", () => {
+  assert.equal(directEmailFromAuthString(auth("work@example.com")), "work@example.com");
+  assert.equal(new URL(directAccountChooserURL("https://auth.openai.com/oauth/authorize?prompt=none")).searchParams.has("prompt"), false);
 });
 
 test("account service opens Codex login URLs in fresh auth mode", async () => {

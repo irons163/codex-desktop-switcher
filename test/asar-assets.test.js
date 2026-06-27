@@ -6,8 +6,8 @@ const path = require("node:path");
 const { withTempHome, writeAsarHeaderFixture } = require("./support/fixtures");
 const {
   createAccountService,
-  findCodexAssetByPrefix,
 } = require("../Sources/CodexAccountSwitcher/Resources/runtime/account-service");
+const { findCodexAssetByPrefix: directFindCodexAssetByPrefix } = require("../Sources/CodexAccountSwitcher/Resources/runtime/asar-assets");
 
 test("account service finds Codex lazy asset chunks from the app asar header", async () => {
   await withTempHome(async (home) => {
@@ -29,7 +29,7 @@ test("account service finds Codex lazy asset chunks from the app asar header", a
       },
     });
 
-    const asset = await findCodexAssetByPrefix(codexApp, "onboarding-login-content-");
+    const asset = await directFindCodexAssetByPrefix(codexApp, "onboarding-login-content-");
     assert.equal(asset.fileName, "onboarding-login-content-Bf2QVA6e.js");
 
     const service = createAccountService({ home, codexApp });
@@ -44,7 +44,7 @@ test("account service finds Codex lazy asset chunks from the app asar header", a
 
 test("asar asset lookup rejects unsafe prefixes", async () => {
   await assert.rejects(
-    () => findCodexAssetByPrefix("/Applications/Codex.app", "../secret"),
+    () => directFindCodexAssetByPrefix("/Applications/Codex.app", "../secret"),
     /Asset prefix is required/,
   );
 });
@@ -57,7 +57,7 @@ test("asar asset lookup reports an invalid header size", async () => {
     await fs.writeFile(asarPath, Buffer.alloc(16));
 
     await assert.rejects(
-      () => findCodexAssetByPrefix(codexApp, "index-"),
+      () => directFindCodexAssetByPrefix(codexApp, "index-"),
       /Invalid asar header size/,
     );
   });
