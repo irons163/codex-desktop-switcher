@@ -135,12 +135,28 @@ public struct RuntimeHelperRunner {
         return result
     }
 
-    public static func defaultNodeExecutable(codexApp: URL) -> URL? {
+    public static func defaultNodeExecutable(
+        codexApp: URL,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL? {
         let bundled = codexApp
             .appendingPathComponent("Contents/Resources/node")
-        if FileManager.default.isExecutableFile(atPath: bundled.path) {
-            return bundled
+        var candidates = [bundled]
+
+        if let path = environment["PATH"] {
+            candidates.append(contentsOf: path
+                .split(separator: ":")
+                .map { URL(fileURLWithPath: String($0)).appendingPathComponent("node") })
         }
-        return nil
+
+        candidates.append(contentsOf: [
+            URL(fileURLWithPath: "/opt/homebrew/bin/node"),
+            URL(fileURLWithPath: "/usr/local/bin/node"),
+            URL(fileURLWithPath: "/opt/local/bin/node")
+        ])
+
+        return candidates.first {
+            FileManager.default.isExecutableFile(atPath: $0.path)
+        }
     }
 }

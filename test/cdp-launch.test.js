@@ -83,6 +83,10 @@ test("Codex process detector recognizes macOS app executable commands", () => {
     true,
   );
   assert.equal(
+    isCodexMainProcessCommand("38534 /Applications/ChatGPT.app/Contents/MacOS/ChatGPT --remote-debugging-port=57330"),
+    true,
+  );
+  assert.equal(
     isCodexMainProcessCommand("38607 /Applications/Codex.app/Contents/Frameworks/Codex Helper.app/Contents/MacOS/Codex Helper --type=renderer"),
     false,
   );
@@ -98,7 +102,7 @@ test("Codex process detector recognizes macOS app executable commands", () => {
 test("Codex process detector returns every main process id", () => {
   const output = [
     "81147     1 /Applications/Codex.app/Contents/MacOS/Codex --remote-debugging-port=57330",
-    "82910     1 /Applications/Codex.app/Contents/MacOS/Codex --remote-debugging-port=57331",
+    "82910     1 /Applications/ChatGPT.app/Contents/MacOS/ChatGPT --remote-debugging-port=57331",
     "82921 82910 /Applications/Codex.app/Contents/Frameworks/Codex Helper.app/Contents/MacOS/Codex Helper --type=renderer",
   ].join("\n");
 

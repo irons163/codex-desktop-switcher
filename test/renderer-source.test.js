@@ -41,6 +41,8 @@ test("renderer account popup exposes save and new sign-in actions directly", () 
 
   assert.match(source, /menuButton\(t\("save"\)/);
   assert.match(source, /menuButton\(t\("newSignIn"\)/);
+  assert.match(source, /hasEmail/);
+  assert.match(source, /hasSettings && hasLogout/);
 });
 
 test("renderer account popup reports async action failures instead of swallowing them", () => {
@@ -53,7 +55,9 @@ test("renderer account popup reports async action failures instead of swallowing
 test("renderer starts Codex native ChatGPT login after preparing a new account", () => {
   const source = rendererInjectionSource();
 
+  assert.match(source, /chatgpt-desktop-auth-url-/);
   assert.match(source, /onboarding-login-content-/);
+  assert.match(source, /login-with-chatgpt/);
   assert.match(source, /find-codex-asset/);
   assert.match(source, /import\(/);
   assert.match(source, /authUrl/);

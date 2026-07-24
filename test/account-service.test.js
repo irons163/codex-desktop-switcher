@@ -140,7 +140,7 @@ test("helper status emits JSON error for missing Codex app", () => {
   assert.notEqual(result.status, 0);
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.ok, false);
-  assert.match(payload.error.message, /Codex\.app not found/);
+  assert.match(payload.error.message, /Codex desktop app not found/);
 });
 
 test("account state only reports usage for visible saved accounts", async () => {

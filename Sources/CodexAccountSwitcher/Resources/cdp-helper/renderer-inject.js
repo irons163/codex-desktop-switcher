@@ -182,10 +182,25 @@
   }
 
   async function getCodexNativeChatGptLogin() {
-    const moduleUrl = await findCodexAssetModule("onboarding-login-content-");
-    const loginModule = await import(moduleUrl);
-    if (typeof loginModule.r !== "function") throw new Error(t("nativeLoginUnavailable"));
-    return loginModule.r;
+    const modulePrefixes = [
+      "chatgpt-desktop-auth-url-",
+      "onboarding-login-content-",
+    ];
+    for (const modulePrefix of modulePrefixes) {
+      try {
+        const moduleUrl = await findCodexAssetModule(modulePrefix);
+        const loginModule = await import(moduleUrl);
+        const startLogin = Object.values(loginModule).find((value) =>
+          typeof value === "function"
+          && /login-with-chatgpt/.test(Function.prototype.toString.call(value))
+        );
+        if (startLogin) return startLogin;
+        if (modulePrefix === "onboarding-login-content-" && typeof loginModule.r === "function") {
+          return loginModule.r;
+        }
+      } catch {}
+    }
+    throw new Error(t("nativeLoginUnavailable"));
   }
 
   async function switchSavedAccount(name) {
@@ -468,13 +483,22 @@
 
   function accountMenuScore(candidate) {
     if (!(candidate instanceof HTMLElement) || !isVisible(candidate)) return -1;
-    const text = compactText(candidate);
+    const text = Array.from(candidate.querySelectorAll('[role="menuitem"]'))
+      .filter((item) => !item.closest(`[${accountPanelAttribute}]`))
+      .map((item) => compactText(item))
+      .join(" ");
+    const hasEmail = /[\w.+-]+@[\w.-]+\.[a-z]{2,}/i.test(text);
+    const hasSettings = /\bsettings\b/i.test(text) || /設定/.test(text);
+    const hasLogout = /\blog out\b|\bsign out\b/i.test(text) || /登出/.test(text);
+    const hasUsage = /\busage remaining\b|\brate limits?\b/i.test(text) || /用量|額度/.test(text);
+    if (!hasEmail && !(hasSettings && hasLogout) && !hasUsage) return -1;
     let score = 0;
-    if (candidate.matches('[role="menu"]')) score += 100;
-    if (candidate.matches("[data-radix-menu-content]")) score += 90;
-    if ((/\bsettings\b/i.test(text) || /設定/.test(text))) score += 20;
-    if ((/\blog out\b/i.test(text) || /登出/.test(text))) score += 20;
-    if (/\busage remaining\b/i.test(text) || /rate limits/i.test(text)) score += 10;
+    if (candidate.matches('[role="menu"]')) score += 5;
+    if (candidate.matches("[data-radix-menu-content]")) score += 5;
+    if (hasEmail) score += 50;
+    if (hasSettings) score += 20;
+    if (hasLogout) score += 30;
+    if (hasUsage) score += 20;
     return score;
   }
 
@@ -1008,14 +1032,14 @@
 
   function schedule() {
     if (scheduledFrame) return;
-    scheduledFrame = window.requestAnimationFrame(() => {
+    scheduledFrame = window.setTimeout(() => {
       scheduledFrame = 0;
       installAccountPanel();
       installNativeAccountsSettingsGroup();
       installDialogSettingsFallback();
       if (nativeSettingsPageRoot && !nativeSettingsPageRoot.isConnected) clearNativeAccountsSettingsPage();
       if (nativeSettingsContentHost && !nativeSettingsContentHost.isConnected) clearNativeAccountsSettingsPage();
-    });
+    }, 0);
   }
 
   function onPointerDown() {
@@ -1039,7 +1063,7 @@
 
   window.__codexAccountSwitcherCleanup = () => {
     if (scheduledFrame) {
-      window.cancelAnimationFrame(scheduledFrame);
+      window.clearTimeout(scheduledFrame);
       scheduledFrame = 0;
     }
     if (observer) observer.disconnect();

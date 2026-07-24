@@ -6,24 +6,40 @@ const path = require("node:path");
 const { isCodexRunning } = require("./processes");
 
 function ensureCodexApp(codexApp) {
-  const executable = path.join(codexApp, "Contents", "MacOS", "Codex");
-  if (!fs.existsSync(executable)) {
-    const error = new Error(`Codex.app not found or missing executable: ${codexApp}`);
+  const executableName = readBundleValue(codexApp, "CFBundleExecutable");
+  const candidates = [executableName, "Codex", "ChatGPT"]
+    .filter(Boolean)
+    .map((name) => path.join(codexApp, "Contents", "MacOS", name));
+  if (!candidates.some((candidate) => isExecutable(candidate))) {
+    const error = new Error(`Codex desktop app not found or missing executable: ${codexApp}`);
     error.code = "missing-codex-app";
     throw error;
   }
 }
 
 function readCodexVersion(codexApp) {
+  return readBundleValue(codexApp, "CFBundleShortVersionString");
+}
+
+function readBundleValue(codexApp, key) {
   const plistPath = path.join(codexApp, "Contents", "Info.plist");
   try {
     return childProcess.execFileSync(
       "/usr/libexec/PlistBuddy",
-      ["-c", "Print :CFBundleShortVersionString", plistPath],
+      ["-c", `Print :${key}`, plistPath],
       { encoding: "utf8" },
     ).trim();
   } catch {
     return null;
+  }
+}
+
+function isExecutable(file) {
+  try {
+    fs.accessSync(file, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
 }
 

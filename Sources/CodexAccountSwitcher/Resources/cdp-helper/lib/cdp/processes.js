@@ -3,7 +3,8 @@
 const childProcess = require("node:child_process");
 
 function isCodexMainProcessCommand(command) {
-  return /\/Codex\.app\/Contents\/MacOS\/Codex(?:\s|$)/.test(String(command || ""));
+  return /\/(?:Codex\.app\/Contents\/MacOS\/Codex|ChatGPT\.app\/Contents\/MacOS\/ChatGPT)(?:\s|$)/
+    .test(String(command || ""));
 }
 
 function codexProcessListHasMainCommand(output) {
@@ -32,7 +33,11 @@ function isCodexRunning() {
 }
 
 async function quitCodex() {
-  childProcess.spawnSync("osascript", ["-e", "tell application \"Codex\" to quit"], { stdio: "ignore" });
+  childProcess.spawnSync(
+    "osascript",
+    ["-e", "tell application id \"com.openai.codex\" to quit"],
+    { stdio: "ignore" },
+  );
   if (await waitForCodexExit(15000)) return;
   terminateCodexMainProcesses("SIGTERM");
   if (await waitForCodexExit(5000)) return;

@@ -37,14 +37,14 @@ async function main() {
       const bridge = await queryBridge(resolved.bridgePort, "/inject", "POST");
       payload = await statusPayload(resolved, bridge);
     } else if (command === "stop" || command === "uninstall") {
-      let bridge = null;
       try {
-        bridge = await queryBridge(resolved.bridgePort, "/stop", "POST");
+        await queryBridge(resolved.bridgePort, "/stop", "POST");
       } catch {}
+      await waitForBridgeExit(resolved.bridgePort);
       payload = {
         ok: true,
         state: { stoppedAt: new Date().toISOString() },
-        status: makeStatusPayload(resolved, bridge, await cdpStatus(resolved.debugPort)),
+        status: makeStatusPayload(resolved, null, await cdpStatus(resolved.debugPort)),
       };
     } else {
       throw Object.assign(new Error(`Unknown command: ${command}`), { code: "usage" });
@@ -61,6 +61,19 @@ async function main() {
     });
     process.exitCode = 1;
   }
+}
+
+async function waitForBridgeExit(bridgePort, timeoutMs = 5000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      await queryBridge(bridgePort);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for account switcher bridge on port ${bridgePort} to stop.`);
 }
 
 async function statusPayload(options, knownBridge = null) {

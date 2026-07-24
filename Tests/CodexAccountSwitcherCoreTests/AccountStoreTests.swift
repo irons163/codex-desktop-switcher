@@ -89,6 +89,26 @@ final class AccountStoreTests: XCTestCase {
             XCTAssertEqual(error.localizedDescription, "Use Launch + Inject first.")
         }
     }
+
+    func testNodeExecutableIsResolvedFromPathWhenCodexDoesNotBundleNode() throws {
+        try withTemporaryHome { root in
+            let bin = root.appendingPathComponent("bin", isDirectory: true)
+            let node = bin.appendingPathComponent("node")
+            try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+            XCTAssertTrue(FileManager.default.createFile(atPath: node.path, contents: Data()))
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: node.path
+            )
+
+            let resolved = RuntimeHelperRunner.defaultNodeExecutable(
+                codexApp: root.appendingPathComponent("Codex.app"),
+                environment: ["PATH": bin.path]
+            )
+
+            XCTAssertEqual(resolved, node)
+        }
+    }
 }
 
 private func withTemporaryHome(_ body: (URL) throws -> Void) throws {

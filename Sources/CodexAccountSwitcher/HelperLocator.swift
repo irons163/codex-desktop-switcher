@@ -3,7 +3,16 @@ import CodexAccountSwitcherCore
 
 enum HelperLocator {
     static var defaultCodexApp: URL {
-        URL(fileURLWithPath: "/Applications/Codex.app")
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let candidates = [
+            URL(fileURLWithPath: "/Applications/Codex.app"),
+            URL(fileURLWithPath: "/Applications/ChatGPT.app"),
+            home.appendingPathComponent("Applications/Codex.app"),
+            home.appendingPathComponent("Applications/ChatGPT.app")
+        ]
+
+        return candidates.first(where: isCodexDesktopApp)
+            ?? URL(fileURLWithPath: "/Applications/Codex.app")
     }
 
     static var defaultUserRoot: URL {
@@ -33,6 +42,16 @@ enum HelperLocator {
             }
         }
         throw HelperLocationError.missingHelper
+    }
+
+    private static func isCodexDesktopApp(_ url: URL) -> Bool {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return false
+        }
+        if url.lastPathComponent == "Codex.app" {
+            return true
+        }
+        return Bundle(url: url)?.bundleIdentifier == "com.openai.codex"
     }
 
 }
