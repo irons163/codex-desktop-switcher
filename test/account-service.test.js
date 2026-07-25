@@ -187,3 +187,25 @@ test("clear-active backs up auth before removing the active marker", async () =>
     await assert.rejects(() => fs.access(path.join(codexDir, "current_account")), { code: "ENOENT" });
   });
 });
+
+test("account service reads and writes language preferences", async () => {
+  await withTempHome(async (home) => {
+    const userRoot = path.join(home, "switcher");
+    const service = createAccountService({ home, userRoot });
+
+    let result = await service.handle({ action: "preferences" });
+    assert.equal(result.ok, true);
+    assert.equal(result.preferences.language, "auto");
+
+    result = await service.handle({ action: "preferences", language: "en" });
+    assert.equal(result.ok, true);
+    assert.equal(result.preferences.language, "en");
+    assert.match(
+      await fs.readFile(path.join(userRoot, "preferences.json"), "utf8"),
+      /"language": "en"/,
+    );
+
+    result = await service.handle({ action: "preferences" });
+    assert.equal(result.preferences.language, "en");
+  });
+});

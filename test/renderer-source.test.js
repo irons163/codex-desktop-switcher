@@ -43,6 +43,8 @@ test("renderer account popup exposes save and new sign-in actions directly", () 
   assert.match(source, /menuButton\(t\("newSignIn"\)/);
   assert.match(source, /hasEmail/);
   assert.match(source, /hasSettings && hasLogout/);
+  assert.match(source, /__codexAccountSwitcherMessages/);
+  assert.match(source, /SUPPORTED_LOCALES/);
 });
 
 test("renderer account popup reports async action failures instead of swallowing them", () => {

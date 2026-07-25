@@ -37,7 +37,12 @@ async function serveBridge(options) {
       log(`relaunch failed: ${state.lastError}`);
     });
   };
-  const service = createAccountService({ home: os.homedir(), relaunch, codexApp: options.codexApp });
+  const service = createAccountService({
+    home: os.homedir(),
+    relaunch,
+    codexApp: options.codexApp,
+    userRoot: options.userRoot,
+  });
 
   async function injectOnce() {
     await ensureInjectableTarget(state.debugPort);

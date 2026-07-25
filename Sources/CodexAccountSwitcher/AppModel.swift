@@ -8,20 +8,37 @@ final class AppModel: ObservableObject {
     @Published var helperResult: HelperCommandResult?
     @Published var isBusy = false
     @Published var message: String?
+    @Published var preferences: AppPreferences {
+        didSet {
+            guard preferences != oldValue else { return }
+            try? preferencesStore.save(preferences)
+        }
+    }
 
     let accountStore = AccountStore()
     let codexApp = HelperLocator.defaultCodexApp
     let userRoot = HelperLocator.defaultUserRoot
+    private let preferencesStore: AppPreferencesStore
+
+    var l10n: LocalizedText {
+        LocalizedText(catalog: LocalizationSupport.catalog, preference: preferences.language)
+    }
+
+    init() {
+        let userRoot = HelperLocator.defaultUserRoot
+        preferencesStore = AppPreferencesStore(userRoot: userRoot)
+        preferences = preferencesStore.load()
+    }
 
     var bridgeStatusText: String {
         guard let status = helperResult?.status else { return "-" }
         if status.bridgeRunning == true && status.isInjected == true {
-            return LocalizedText.injected
+            return l10n.injected
         }
         if status.bridgeRunning == true {
-            return LocalizedText.running
+            return l10n.running
         }
-        return LocalizedText.notRunning
+        return l10n.notRunning
     }
 
     func refresh() {
@@ -82,7 +99,7 @@ final class AppModel: ObservableObject {
         defer { isBusy = false }
         do {
             try operation()
-            message = LocalizedText.done(action)
+            message = l10n.done(action)
         } catch {
             message = error.localizedDescription
         }

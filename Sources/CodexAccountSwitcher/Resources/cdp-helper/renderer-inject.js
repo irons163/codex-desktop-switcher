@@ -20,75 +20,89 @@
   const commandAttribute = "data-codex-account-switcher-command";
   const commandAccountAttribute = "data-codex-account-switcher-account";
 
-  const I18N = {
-    "zh-Hant": {
-      title: "帳號",
-      configure: "管理帳號",
-      save: "儲存目前帳號",
-      newSignIn: "新增登入",
-      delete: "刪除",
-      emptySaved: "尚未保存帳號",
-      emptyActive: "尚未登入 Codex",
-      unsavedActive: "目前登入尚未保存",
-      current: "目前",
-      switch: "切換",
-      switching: "切換中...",
-      settingsGroup: "Account Switcher",
-      settingsTitle: "帳號",
-      savedAccounts: "已保存帳號",
-      activeAccount: "目前帳號",
-      refresh: "刷新",
-      loading: "載入中...",
-      ready: "就緒",
-      bridgeOffline: "Account Switcher bridge 尚未連線",
-      accountName: "帳號名稱",
-      saveDone: "已儲存",
-      deleteDone: "已刪除",
-      switchDone: "已切換",
-      relaunching: "正在重新啟動 Codex...",
-      nativeLoginUnavailable: "找不到 Codex 原生登入流程，請更新後重新注入",
-      missingAuthUrl: "Codex 登入流程沒有回傳登入網址，請重新啟動 Codex 後再試",
-      loginAlreadyInProgress: "Codex 已有一個登入流程卡住，請重啟 Codex 後再按新增登入",
-      openingSignIn: "正在開啟可選帳號登入...",
-      newSignInDone: "已開啟可選帳號登入頁",
-      noAccounts: "沒有已保存帳號",
-    },
-    en: {
-      title: "Accounts",
-      configure: "Configure accounts",
-      save: "Save current account",
-      newSignIn: "New sign-in",
-      delete: "Delete",
-      emptySaved: "No saved accounts yet",
-      emptyActive: "Codex is not signed in",
-      unsavedActive: "Signed in but not saved",
-      current: "current",
-      switch: "Switch",
-      switching: "Switching...",
-      settingsGroup: "Account Switcher",
-      settingsTitle: "Accounts",
-      savedAccounts: "Saved accounts",
-      activeAccount: "Current account",
-      refresh: "Refresh",
-      loading: "Loading...",
-      ready: "Ready",
-      bridgeOffline: "Account Switcher bridge is not connected",
-      accountName: "Account name",
-      saveDone: "Saved",
-      deleteDone: "Deleted",
-      switchDone: "Switched",
-      relaunching: "Relaunching Codex...",
-      nativeLoginUnavailable: "Codex native sign-in flow was not found. Update and inject again.",
-      missingAuthUrl: "Codex sign-in did not return a login URL. Restart Codex and try again.",
-      loginAlreadyInProgress: "Codex already has a stuck sign-in flow. Restart Codex, then use New sign-in again.",
-      openingSignIn: "Opening account chooser sign-in...",
-      newSignInDone: "Opened account chooser sign-in",
-      noAccounts: "No saved accounts",
-    },
+  const MESSAGE_CATALOG = window.__codexAccountSwitcherMessages || { en: {} };
+  const INHERIT_LOCALE = {
+    "zh-HK": "zh-TW",
+    "es-419": "es-ES",
+    "fr-CA": "fr-FR",
+    "pt-PT": "pt-BR",
+    "nb-NO": "da-DK",
   };
+  const LEGACY_TAGS = {
+    "zh-Hant": "zh-TW",
+    "zh-Hans": "zh-CN",
+    no: "nb-NO",
+    "no-NO": "nb-NO",
+    nb: "nb-NO",
+  };
+  const SUPPORTED_LOCALES = ["auto", ...Object.keys(MESSAGE_CATALOG).sort((a, b) => a.localeCompare(b))];
 
-  const lang = (navigator.language || "").toLowerCase().startsWith("zh") ? "zh-Hant" : "en";
-  const t = (key) => I18N[lang][key] || I18N.en[key] || key;
+  let languagePreference = "auto";
+
+  function normalizeLocaleTag(tag) {
+    if (!tag || typeof tag !== "string") return "";
+    const trimmed = tag.trim();
+    if (!trimmed) return "";
+    if (LEGACY_TAGS[trimmed]) return LEGACY_TAGS[trimmed];
+    const parts = trimmed.split("-").filter(Boolean);
+    if (!parts.length) return "";
+    if (parts.length === 1) return parts[0].toLowerCase();
+    const [language, ...rest] = parts;
+    const normalizedRest = rest.map((part) => {
+      if (part.length === 2) return part.toUpperCase();
+      if (part.length === 4) return `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`;
+      return part;
+    });
+    const candidate = [language.toLowerCase(), ...normalizedRest].join("-");
+    return LEGACY_TAGS[candidate] || candidate;
+  }
+
+  function resolveLocaleTag(tag) {
+    const normalized = normalizeLocaleTag(tag);
+    if (!normalized) return "en";
+    if (MESSAGE_CATALOG[normalized]) return normalized;
+    const inherited = INHERIT_LOCALE[normalized];
+    if (inherited && MESSAGE_CATALOG[inherited]) return inherited;
+    const language = normalized.split("-")[0];
+    const regional = Object.keys(MESSAGE_CATALOG).find((locale) => locale.toLowerCase().startsWith(`${language.toLowerCase()}-`));
+    return regional || "en";
+  }
+
+  function resolveLocale(preference = languagePreference) {
+    if (!preference || preference === "auto") {
+      return resolveLocaleTag(navigator.language || "en");
+    }
+    return resolveLocaleTag(preference);
+  }
+
+  function lookupMessage(locale, key) {
+    const direct = MESSAGE_CATALOG[locale]?.[key];
+    if (direct != null) return direct;
+    const inherited = INHERIT_LOCALE[locale];
+    if (inherited && MESSAGE_CATALOG[inherited]?.[key] != null) {
+      return MESSAGE_CATALOG[inherited][key];
+    }
+    return MESSAGE_CATALOG.en?.[key] || key;
+  }
+
+  const t = (key) => lookupMessage(resolveLocale(), key);
+
+  function localeDisplayName(code) {
+    if (code === "auto") return t("languageAuto");
+    try {
+      const display = new Intl.DisplayNames([resolveLocale()], { type: "language" });
+      return display.of(code) || code;
+    } catch {
+      return code;
+    }
+  }
+
+  async function refreshLanguagePreference() {
+    const result = await invoke({ action: "preferences" });
+    if (result.ok && result.preferences?.language) {
+      languagePreference = result.preferences.language;
+    }
+  }
   const pending = new Map();
   let nextId = 1;
   let observer = null;
@@ -436,6 +450,7 @@
   async function renderPanel(panel) {
     panel.textContent = "";
     panel.style.cssText = "display:flex;flex-direction:column;gap:3px;padding:6px 12px;border-top:1px solid color-mix(in srgb,currentColor 12%,transparent);";
+    await refreshLanguagePreference();
     const heading = document.createElement("div");
     heading.textContent = t("title");
     heading.style.cssText = "font-size:12px;color:var(--color-token-text-secondary,currentColor);padding:2px 8px;";
@@ -846,6 +861,7 @@
 
   async function refreshNativeAccountsSettingsPage(page) {
     if (!(page instanceof HTMLElement)) return;
+    await refreshLanguagePreference();
     setStatus(page, t("loading"));
     const result = await invoke({ action: "state" });
     if (!page.isConnected) return;
@@ -857,8 +873,9 @@
     setStatus(page, t("ready"));
   }
 
-  function renderNativeAccountsSettingsPage(host) {
+  async function renderNativeAccountsSettingsPage(host) {
     if (!(host instanceof HTMLElement)) return null;
+    await refreshLanguagePreference();
     host.querySelectorAll(`[${settingsPageAttribute}]`).forEach((node) => node.remove());
     stashNativeSettingsContent(host);
     host.setAttribute(settingsContentHostAttribute, "true");
@@ -904,6 +921,22 @@
     accountsPanel.setAttribute("data-codex-account-switcher-list", "true");
     accountsSection.appendChild(accountsPanel);
 
+    const languageSection = pageSection(t("language"));
+    const languagePanel = document.createElement("div");
+    languagePanel.className = "codex-account-switcher-panel";
+    languagePanel.style.maxHeight = "180px";
+    languagePanel.style.overflowY = "auto";
+    const languageActions = document.createElement("div");
+    languageActions.className = "codex-account-switcher-actions";
+    languageActions.style.flexWrap = "wrap";
+    for (const code of SUPPORTED_LOCALES) {
+      const button = commandButton(localeDisplayName(code), "language", code);
+      if (languagePreference === code) button.disabled = true;
+      languageActions.appendChild(button);
+    }
+    languagePanel.appendChild(languageActions);
+    languageSection.appendChild(languagePanel);
+
     const status = document.createElement("div");
     status.className = "codex-account-switcher-status";
     status.setAttribute("data-codex-account-switcher-status", "true");
@@ -912,6 +945,7 @@
     page.appendChild(header);
     page.appendChild(activeSection);
     page.appendChild(accountsSection);
+    page.appendChild(languageSection);
     page.appendChild(status);
     host.appendChild(page);
 
@@ -929,7 +963,9 @@
     if (!(sidebar instanceof HTMLElement)) return false;
     const contentRoot = findNativeSettingsContentRoot(sidebar);
     if (!(contentRoot instanceof HTMLElement)) return false;
-    renderNativeAccountsSettingsPage(contentRoot);
+    renderNativeAccountsSettingsPage(contentRoot).catch((error) => {
+      console.warn("[Codex Account Switcher] settings page failed", error);
+    });
     return true;
   }
 
@@ -938,10 +974,11 @@
     const dialog = Array.from(document.querySelectorAll('[role="dialog"]'))
       .find((element) => element instanceof HTMLElement && /settings|設定/i.test(compactText(element)));
     if (!(dialog instanceof HTMLElement) || dialog.querySelector(`[${settingsPageAttribute}]`)) return;
-    const panel = renderNativeAccountsSettingsPage(dialog);
-    if (panel instanceof HTMLElement) {
-      panel.style.padding = "16px";
-    }
+    renderNativeAccountsSettingsPage(dialog).then((panel) => {
+      if (panel instanceof HTMLElement) panel.style.padding = "16px";
+    }).catch((error) => {
+      console.warn("[Codex Account Switcher] dialog settings failed", error);
+    });
   }
 
   async function handleAccountCommand(target) {
@@ -954,6 +991,17 @@
       setPageButtonsDisabled(page, true);
       if (command === "refresh") {
         await refreshNativeAccountsSettingsPage(page);
+        return;
+      }
+      if (command === "language") {
+        const language = target.getAttribute(commandAccountAttribute) || "auto";
+        const result = await invoke({ action: "preferences", language });
+        if (!result.ok) throw new Error(result.error?.message || "Language update failed");
+        languagePreference = result.preferences.language;
+        const host = nativeSettingsContentHost;
+        if (host instanceof HTMLElement) {
+          await renderNativeAccountsSettingsPage(host);
+        }
         return;
       }
       if (command === "save") {

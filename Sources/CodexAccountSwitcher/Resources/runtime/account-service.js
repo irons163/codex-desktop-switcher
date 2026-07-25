@@ -1,17 +1,20 @@
 "use strict";
 
 const os = require("node:os");
+const path = require("node:path");
 const { accountChooserURL, openAccountChooserURL, openExternalURL } = require("./login-url");
 const { clearActiveAuth, readState, saveCurrentAccount, startNewLogin, switchAccount, deleteAccount } = require("./auth-store");
 const { codexAuthPaths, normalizeAccountName } = require("./account-paths");
 const { emailFromAuthString } = require("./auth-email");
 const { collectAsarFiles, findCodexAssetByPrefix } = require("./asar-assets");
+const { readPreferences, writePreferences } = require("./preferences");
 
 function createAccountService(options = {}) {
   const home = options.home || os.homedir();
   const relaunch = options.relaunch || (() => {});
   const openURL = options.openURL || openExternalURL;
   const codexApp = options.codexApp || "/Applications/Codex.app";
+  const userRoot = options.userRoot || path.join(home, "Library/Application Support/codex-account-switcher");
   const paths = codexAuthPaths(home);
 
   return {
@@ -43,6 +46,12 @@ function createAccountService(options = {}) {
           const state = await clearActiveAuth(paths);
           if (message.relaunch !== false) setTimeout(relaunch, 250);
           return ok({ state: { ...state, requiresAppRelaunch: true } });
+        }
+        if (action === "preferences") {
+          if (message.language) {
+            return ok({ preferences: await writePreferences(userRoot, { language: message.language }) });
+          }
+          return ok({ preferences: await readPreferences(userRoot) });
         }
         return fail(`Unknown account action: ${String(action)}`);
       } catch (error) {

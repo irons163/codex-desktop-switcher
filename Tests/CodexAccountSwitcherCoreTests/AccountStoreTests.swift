@@ -109,6 +109,19 @@ final class AccountStoreTests: XCTestCase {
             XCTAssertEqual(resolved, node)
         }
     }
+
+    func testPreferencesStorePersistsManualLanguageSelection() throws {
+        try withTemporaryHome { root in
+            let store = AppPreferencesStore(userRoot: root)
+            XCTAssertEqual(store.load(), AppPreferences())
+
+            try store.save(AppPreferences(language: "en"))
+            XCTAssertEqual(store.load().language, "en")
+
+            let resolved = store.load().resolvedLocale(navigatorLanguage: "zh-TW")
+            XCTAssertEqual(resolved, "en")
+        }
+    }
 }
 
 private func withTemporaryHome(_ body: (URL) throws -> Void) throws {

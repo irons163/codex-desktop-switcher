@@ -7,7 +7,9 @@ const { CdpSession } = require("./session");
 const { codexPageTargets, pickCodexTarget, targetWebSocket } = require("./targets");
 
 function rendererInjectionSource() {
-  return fs.readFileSync(path.resolve(__dirname, "..", "..", "renderer-inject.js"), "utf8");
+  const inject = fs.readFileSync(path.resolve(__dirname, "..", "..", "renderer-inject.js"), "utf8");
+  const messages = fs.readFileSync(path.resolve(__dirname, "..", "..", "..", "locales", "messages.json"), "utf8");
+  return `window.__codexAccountSwitcherMessages=${messages};\n${inject}`;
 }
 
 async function injectRenderer(debugPort, accountService, logger = () => {}) {
