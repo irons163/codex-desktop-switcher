@@ -2,6 +2,22 @@
 
 Native macOS SwiftUI manager for launching Codex with an in-app account switcher.
 
+## Screenshots
+
+Screenshots use placeholder accounts (`@example.com`) for demo purposes.
+
+### Launcher
+
+![Codex Account Switcher launcher](docs/screenshots/launcher-mockup.png)
+
+### In-Codex settings
+
+![Accounts settings page injected into Codex](docs/screenshots/codex-accounts-mockup.png)
+
+### Profile menu
+
+![Account switcher menu in the Codex profile dropdown](docs/screenshots/codex-menu-mockup.png)
+
 This version does **not** modify `/Applications/Codex.app`. It starts Codex with a
 local Chromium DevTools Protocol port, keeps a small local bridge process alive,
 and injects the account UI into the Codex renderer at runtime.

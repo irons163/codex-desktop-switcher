@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Codex Menu Mockup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 420px;
+      height: 360px;
+      background: linear-gradient(180deg, #1a1a1a 0%, #111 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #ececec;
+      padding: 24px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+    }
+    .profile-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #d7d7d7;
+    }
+    .avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6b8afd, #9b6bff);
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: white;
+    }
+    .menu {
+      width: 260px;
+      background: #2a2a2a;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      box-shadow: 0 18px 40px rgba(0,0,0,.45);
+      overflow: hidden;
+      padding: 6px;
+    }
+    .menu-heading {
+      font-size: 12px;
+      color: #9b9b9b;
+      padding: 6px 8px 4px;
+    }
+    .menu-item {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: #ececec;
+      text-align: left;
+      font: inherit;
+      font-size: 13px;
+      border-radius: 8px;
+      padding: 6px 8px;
+      cursor: default;
+    }
+    .menu-item:hover { background: rgba(255,255,255,.08); }
+    .menu-item.muted { color: #b7b7b7; }
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,.08);
+      margin: 4px 2px;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="profile-chip">
+      <span class="avatar">A</span>
+      <span>alex@example.com</span>
+    </div>
+    <div class="menu">
+      <div class="menu-heading">Accounts</div>
+      <button class="menu-item muted">alex@example.com · work</button>
+      <button class="menu-item">dev@example.com · personal</button>
+      <div class="divider"></div>
+      <button class="menu-item">Save current account</button>
+      <button class="menu-item">New sign-in</button>
+      <button class="menu-item">Configure accounts</button>
+    </div>
+  </div>
+</body>
+</html>
