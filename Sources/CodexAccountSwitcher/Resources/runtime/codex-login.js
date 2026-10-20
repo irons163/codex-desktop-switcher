@@ -123,7 +123,7 @@ class LoginSession {
 
   async open(openURL) {
     await this.request("initialize", {
-      clientInfo: { name: "codex_account_switcher", title: "Codex Account Switcher", version: "0.1.2" },
+      clientInfo: { name: "codex_account_switcher", title: "Codex Account Switcher", version: "0.1.3" },
     });
     this.write({ method: "initialized", params: {} });
     const login = await this.request("account/login/start", { type: "chatgpt" });

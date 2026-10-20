@@ -4,7 +4,7 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const { accountPath, normalizeAccountName, pathExists } = require("./account-paths");
-const { emailFromAuthString } = require("./auth-email");
+const { identityFromAuthString } = require("./auth-identity");
 
 async function readState(paths, { autosave = true } = {}) {
   if (autosave) await ensureAutosavedActiveAccount(paths);
@@ -15,10 +15,19 @@ async function readState(paths, { autosave = true } = {}) {
   const accountEmails = Object.fromEntries(
     visibleAccounts.map(({ name, email }) => [name, email]).filter(([, email]) => email),
   );
+  const accountLabels = Object.fromEntries(visibleAccounts.map(({ name, email, identity }) => [
+    name, [email || name, identity?.workspaceLabel].filter(Boolean).join(" · "),
+  ]));
+  const labelCounts = new Map();
+  for (const label of Object.values(accountLabels)) labelCounts.set(label, (labelCounts.get(label) || 0) + 1);
+  for (const name of accounts) {
+    if (labelCounts.get(accountLabels[name]) > 1) accountLabels[name] += ` · ${name}`;
+  }
   const accountUsage = await readAccountUsage(paths, accounts);
   return {
     accounts,
     accountEmails,
+    accountLabels,
     accountUsage,
     current,
     hasActiveAuth: await pathExists(paths.AUTH_PATH),
@@ -36,8 +45,17 @@ async function saveCurrentAccount(paths, rawName) {
     throw new Error(`No active Codex auth file found at ${paths.AUTH_PATH}`);
   }
   await ensurePrivateStorage(paths);
+  const active = await fsp.readFile(paths.AUTH_PATH, "utf8");
+  const activeKey = identityFromAuthString(active)?.key;
+  const destination = accountPath(paths, name);
+  if (await pathExists(destination)) {
+    const savedKey = identityFromAuthString(await fsp.readFile(destination, "utf8"))?.key;
+    if (activeKey && savedKey && activeKey !== savedKey) {
+      throw new Error("That name is already used by a different account or workspace. Choose another name.");
+    }
+  }
   await fsp.chmod(paths.AUTH_PATH, 0o600);
-  await copyPrivateAuth(paths.AUTH_PATH, accountPath(paths, name));
+  await writePrivateAuth(destination, active);
   await fsp.writeFile(paths.CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return readState(paths);
 }
@@ -93,15 +111,15 @@ async function ensureAutosavedActiveAccount(paths) {
   }
 
   const active = await fsp.readFile(paths.AUTH_PATH, "utf8");
-  const sameEmail = await findMatchingAccountByEmail(paths, accounts, active);
-  if (sameEmail) {
-    await copyPrivateAuth(paths.AUTH_PATH, accountPath(paths, sameEmail));
-    await fsp.writeFile(paths.CURRENT_NAME_PATH, `${sameEmail}\n`, "utf8");
-    return sameEmail;
+  const sameIdentity = await findMatchingAccountByIdentity(paths, accounts, active);
+  if (sameIdentity) {
+    await writePrivateAuth(accountPath(paths, sameIdentity), active);
+    await fsp.writeFile(paths.CURRENT_NAME_PATH, `${sameIdentity}\n`, "utf8");
+    return sameIdentity;
   }
 
   const name = await nextAvailableAccountName(paths, "account");
-  await copyPrivateAuth(paths.AUTH_PATH, accountPath(paths, name));
+  await writePrivateAuth(accountPath(paths, name), active);
   await fsp.writeFile(paths.CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return name;
 }
@@ -140,13 +158,7 @@ async function getCurrentAccountName(paths, accounts) {
   if (!(await pathExists(paths.AUTH_PATH))) return null;
   const matched = await findMatchingAccountByContents(paths, accounts);
   if (matched) return matched;
-  try {
-    const name = (await fsp.readFile(paths.CURRENT_NAME_PATH, "utf8")).trim();
-    if (name && accounts.includes(name)) return name;
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-  }
-  return null;
+  return findMatchingAccountByIdentity(paths, accounts, await fsp.readFile(paths.AUTH_PATH, "utf8"));
 }
 
 async function findMatchingAccountByContents(paths, accounts) {
@@ -164,9 +176,9 @@ async function findMatchingAccountByContents(paths, accounts) {
   return null;
 }
 
-async function findMatchingAccountByEmail(paths, accounts, activeContents) {
-  const activeEmail = emailFromAuthString(activeContents)?.toLowerCase();
-  if (!activeEmail) return null;
+async function findMatchingAccountByIdentity(paths, accounts, activeContents) {
+  const activeKey = identityFromAuthString(activeContents)?.key;
+  if (!activeKey) return null;
   let current = null;
   try {
     current = (await fsp.readFile(paths.CURRENT_NAME_PATH, "utf8")).trim();
@@ -178,7 +190,7 @@ async function findMatchingAccountByEmail(paths, accounts, activeContents) {
     try {
       const filePath = accountPath(paths, name);
       const [contents, stat] = await Promise.all([fsp.readFile(filePath, "utf8"), fsp.stat(filePath)]);
-      if (emailFromAuthString(contents)?.toLowerCase() === activeEmail) {
+      if (identityFromAuthString(contents)?.key === activeKey) {
         matches.push({ name, isCurrent: name === current, mtimeMs: stat.mtimeMs });
       }
     } catch {}
@@ -195,7 +207,7 @@ async function selectVisibleAccounts(paths, accounts) {
   const details = await Promise.all(accounts.map((name) => readAccountDetails(paths, name)));
   const byIdentity = new Map();
   for (const detail of details) {
-    const key = detail.email ? `email:${detail.email.toLowerCase()}` : `name:${detail.name}`;
+    const key = detail.identity?.key || `name:${detail.name}`;
     const existing = byIdentity.get(key);
     if (!existing || compareAccountPreference(detail, existing) < 0) byIdentity.set(key, detail);
   }
@@ -213,9 +225,11 @@ async function readAccountDetails(paths, name) {
     raw = contents;
     mtimeMs = stat.mtimeMs;
   } catch {}
+  const identity = raw ? identityFromAuthString(raw) : null;
   return {
     name,
-    email: raw ? emailFromAuthString(raw) : null,
+    email: identity?.email || null,
+    identity,
     isActive: raw ? await accountContentsMatchActive(paths, raw) : false,
     mtimeMs,
   };

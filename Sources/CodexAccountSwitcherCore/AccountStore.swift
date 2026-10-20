@@ -56,8 +56,15 @@ public final class AccountStore {
             throw AccountStoreError.missingActiveAuth(authPath)
         }
         try preparePrivateDirectories()
+        let active = try String(contentsOf: authPath, encoding: .utf8)
+        let activeKey = AuthIdentity.from(active)?.key
+        if let saved = try? String(contentsOf: accountPath(name), encoding: .utf8),
+           let savedKey = AuthIdentity.from(saved)?.key,
+           let activeKey, savedKey != activeKey {
+            throw AccountStoreError.accountNameInUse(name)
+        }
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: authPath.path)
-        try replaceFile(at: accountPath(name), withContentsOf: authPath)
+        try replaceFile(at: accountPath(name), with: Data(active.utf8))
         try "\(name)\n".write(to: currentAccountPath, atomically: true, encoding: .utf8)
         return try readState()
     }
@@ -107,13 +114,17 @@ public final class AccountStore {
         let visibleNames = visible.map(\.name)
         let current = try currentAccountName(among: visibleNames)
         let usage = try readUsage()
+        let labelCounts = Dictionary(grouping: visible, by: \.displayLabel).mapValues(\.count)
         let snapshots = visible.map { detail in
             AccountSnapshot(
                 name: detail.name,
                 email: detail.email,
                 isCurrent: detail.name == current,
                 modifiedAt: detail.modifiedAt,
-                usage: usage[detail.name]
+                usage: usage[detail.name],
+                workspaceLabel: (labelCounts[detail.displayLabel] ?? 0) > 1
+                    ? [detail.identity?.workspaceLabel, detail.name].compactMap { $0 }.joined(separator: " · ")
+                    : detail.identity?.workspaceLabel
             )
         }
         return AccountState(
@@ -149,14 +160,14 @@ public final class AccountStore {
         }
 
         let active = try String(contentsOf: authPath, encoding: .utf8)
-        if let sameEmail = try findMatchingAccountByEmail(accounts, activeContents: active) {
-            try replaceFile(at: accountPath(sameEmail), withContentsOf: authPath)
-            try "\(sameEmail)\n".write(to: currentAccountPath, atomically: true, encoding: .utf8)
-            return sameEmail
+        if let sameIdentity = try findMatchingAccountByIdentity(accounts, activeContents: active) {
+            try replaceFile(at: accountPath(sameIdentity), with: Data(active.utf8))
+            try "\(sameIdentity)\n".write(to: currentAccountPath, atomically: true, encoding: .utf8)
+            return sameIdentity
         }
 
         let name = try nextAvailableAccountName(baseName: "account")
-        try replaceFile(at: accountPath(name), withContentsOf: authPath)
+        try replaceFile(at: accountPath(name), with: Data(active.utf8))
         try "\(name)\n".write(to: currentAccountPath, atomically: true, encoding: .utf8)
         return name
     }
@@ -168,13 +179,8 @@ public final class AccountStore {
         if let matched = try findMatchingAccountByContents(accounts) {
             return matched
         }
-        if let marker = try? String(contentsOf: currentAccountPath, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !marker.isEmpty,
-           accounts.contains(marker) {
-            return marker
-        }
-        return nil
+        let active = try String(contentsOf: authPath, encoding: .utf8)
+        return try findMatchingAccountByIdentity(accounts, activeContents: active)
     }
 
     private func findMatchingAccountByContents(_ accounts: [String]) throws -> String? {
@@ -189,8 +195,8 @@ public final class AccountStore {
         return nil
     }
 
-    private func findMatchingAccountByEmail(_ accounts: [String], activeContents: String) throws -> String? {
-        guard let activeEmail = AuthEmailExtractor.email(from: activeContents)?.lowercased() else {
+    private func findMatchingAccountByIdentity(_ accounts: [String], activeContents: String) throws -> String? {
+        guard let activeKey = AuthIdentity.from(activeContents)?.key else {
             return nil
         }
         let current = try? String(contentsOf: currentAccountPath, encoding: .utf8)
@@ -198,11 +204,12 @@ public final class AccountStore {
         let matches = try accounts.compactMap { name -> AccountDetail? in
             let url = accountPath(name)
             guard let contents = try? String(contentsOf: url, encoding: .utf8),
-                  AuthEmailExtractor.email(from: contents)?.lowercased() == activeEmail else {
+                  AuthIdentity.from(contents)?.key == activeKey else {
                 return nil
             }
             let modified = try modificationDate(for: url)
-            return AccountDetail(name: name, email: activeEmail, isActive: false, modifiedAt: modified, isCurrentMarker: name == current)
+            let identity = AuthIdentity.from(contents)
+            return AccountDetail(name: name, identity: identity, isActive: false, modifiedAt: modified, isCurrentMarker: name == current)
         }
         return matches.sorted(by: preferAccountDetail).first?.name
     }
@@ -211,7 +218,7 @@ public final class AccountStore {
         let details = try names.map(readAccountDetail)
         var byIdentity: [String: AccountDetail] = [:]
         for detail in details {
-            let key = detail.email.map { "email:\($0.lowercased())" } ?? "name:\(detail.name)"
+            let key = detail.identity?.key ?? "name:\(detail.name)"
             if let existing = byIdentity[key] {
                 if preferAccountDetail(detail, existing) {
                     byIdentity[key] = detail
@@ -229,7 +236,7 @@ public final class AccountStore {
         let active = (try? String(contentsOf: authPath, encoding: .utf8)) == contents
         return AccountDetail(
             name: name,
-            email: contents.flatMap(AuthEmailExtractor.email(from:)),
+            identity: contents.flatMap(AuthIdentity.from),
             isActive: active,
             modifiedAt: try modificationDate(for: url),
             isCurrentMarker: false
@@ -281,7 +288,11 @@ public final class AccountStore {
     }
 
     private func replaceFile(at destination: URL, withContentsOf source: URL) throws {
-        try Data(contentsOf: source).write(to: destination, options: .atomic)
+        try replaceFile(at: destination, with: Data(contentsOf: source))
+    }
+
+    private func replaceFile(at destination: URL, with data: Data) throws {
+        try data.write(to: destination, options: .atomic)
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
     }
 
@@ -299,7 +310,11 @@ public final class AccountStore {
 
 private struct AccountDetail {
     let name: String
-    let email: String?
+    let identity: AuthIdentity?
+    var email: String? { identity?.email }
+    var displayLabel: String {
+        [email ?? name, identity?.workspaceLabel].compactMap { $0 }.joined(separator: " · ")
+    }
     let isActive: Bool
     let modifiedAt: Date
     let isCurrentMarker: Bool

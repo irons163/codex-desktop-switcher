@@ -352,7 +352,7 @@
       panel.appendChild(empty);
     }
     for (const name of state.accounts) {
-      const label = `${state.accountEmails[name] || name}${state.current === name ? ` (${t("current")})` : ""}`;
+      const label = `${accountLabel(state, name)}${state.current === name ? ` (${t("current")})` : ""}`;
       panel.appendChild(menuButton(label, async () => {
         panel.textContent = t("switching");
         const switchResult = await switchSavedAccount(name);
@@ -700,8 +700,12 @@
     }
   }
 
+  function accountLabel(state, name) {
+    return state.accountLabels?.[name] || state.accountEmails?.[name] || name;
+  }
+
   function activeAccountLabel(state) {
-    if (state.current) return state.accountEmails[state.current] || state.current;
+    if (state.current) return accountLabel(state, state.current);
     return state.hasActiveAuth ? t("unsavedActive") : t("emptyActive");
   }
 
@@ -732,7 +736,7 @@
       main.className = "codex-account-switcher-main";
       const primary = document.createElement("div");
       primary.className = "codex-account-switcher-primary";
-      primary.textContent = state.accountEmails[name] || name;
+      primary.textContent = accountLabel(state, name);
       const secondary = document.createElement("div");
       secondary.className = "codex-account-switcher-secondary";
       secondary.textContent = state.current === name ? `${name} · ${t("current")}` : name;

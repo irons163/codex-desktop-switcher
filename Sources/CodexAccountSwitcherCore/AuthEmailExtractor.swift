@@ -40,7 +40,8 @@ public enum AuthEmailExtractor {
               let claims = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] else {
             return nil
         }
-        return validEmail(claims["email"])
+        let profile = claims["https://api.openai.com/profile"] as? [String: Any]
+        return validEmail(profile?["email"]) ?? validEmail(claims["email"])
     }
 }
 

@@ -4,13 +4,18 @@ public struct AccountSnapshot: Codable, Equatable, Identifiable {
     public var id: String { name }
     public let name: String
     public let email: String?
+    public let workspaceLabel: String?
+    public var displayLabel: String {
+        [email ?? name, workspaceLabel].compactMap { $0 }.joined(separator: " · ")
+    }
     public let isCurrent: Bool
     public let modifiedAt: Date
     public let usage: AccountUsage?
 
-    public init(name: String, email: String?, isCurrent: Bool, modifiedAt: Date, usage: AccountUsage? = nil) {
+    public init(name: String, email: String?, isCurrent: Bool, modifiedAt: Date, usage: AccountUsage? = nil, workspaceLabel: String? = nil) {
         self.name = name
         self.email = email
+        self.workspaceLabel = workspaceLabel
         self.isCurrent = isCurrent
         self.modifiedAt = modifiedAt
         self.usage = usage
@@ -70,6 +75,7 @@ public enum AccountStoreError: LocalizedError, Equatable {
     case invalidAccountName(String)
     case missingActiveAuth(URL)
     case missingSavedAccount(String)
+    case accountNameInUse(String)
 
     public var errorDescription: String? {
         switch self {
@@ -79,6 +85,8 @@ public enum AccountStoreError: LocalizedError, Equatable {
             "No active Codex auth file found at \(url.path)"
         case .missingSavedAccount(let name):
             "Saved account not found: \(name)"
+        case .accountNameInUse:
+            "That name is already used by a different account or workspace. Choose another name."
         }
     }
 }

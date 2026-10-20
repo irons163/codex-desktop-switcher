@@ -7,12 +7,12 @@
 
 ## 下載
 
-**目前版本：[v0.1.2](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.2)**
+**目前版本：[v0.1.3](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.3)**
 
 | Mac 類型 | 安裝檔 |
 | --- | --- |
-| Apple Silicon（M 系列） | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.2/CodexAccountSwitcher-0.1.2-apple-silicon.dmg) |
-| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.2/CodexAccountSwitcher-0.1.2-intel.dmg) |
+| Apple Silicon（M 系列） | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.3/CodexAccountSwitcher-0.1.3-apple-silicon.dmg) |
+| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.3/CodexAccountSwitcher-0.1.3-intel.dmg) |
 
 兩種安裝檔均使用 Developer ID 簽名並通過 Apple 公證。
 [發布頁面](https://github.com/irons163/codex-desktop-switcher/releases/latest)
@@ -40,9 +40,14 @@
 如果介面未出現，可再次按下 **啟動（Launch）**，再使用 **重新整理（Refresh）**
 確認注入與 bridge 狀態。**進階 → 顯示 Log（Advanced → Reveal Logs）** 可開啟紀錄資料夾。
 
+同一信箱的個人與企業工作區可以分別加入。登入時選擇要儲存的工作區，
+選單會顯示方案與工作區識別碼，切換時會套用該工作區的登入資料。
+舊版已被覆蓋的登入需在更新後重新加入。
+
 ## 功能
 
 - 儲存多個帳號，從 Codex 個人選單或設定頁切換。
+- 依帳號與工作區 ID 分開儲存，同一信箱的個人與企業工作區不會互相覆蓋。
 - 透過完整重新啟動 Codex，讓帳號變更生效。
 - 跟隨系統語言，或從 65 種介面語言中選擇，包含英文與繁體中文。
 - 支援 Codex 與相容的整合版 ChatGPT 桌面程式。

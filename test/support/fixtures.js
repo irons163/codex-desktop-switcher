@@ -13,6 +13,22 @@ function auth(email, profile = email) {
   });
 }
 
+function workspaceAuth(email, accountId, plan = "plus", revision = "original") {
+  const claims = {
+    email,
+    "https://api.openai.com/auth": { chatgpt_account_id: accountId, chatgpt_plan_type: plan },
+  };
+  return JSON.stringify({
+    auth_mode: "chatgpt",
+    tokens: {
+      account_id: accountId,
+      id_token: `header.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.signature`,
+      access_token: revision,
+      refresh_token: "refresh",
+    },
+  });
+}
+
 async function withTempHome(fn) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "codex-switcher-helper-"));
   try {
@@ -41,4 +57,4 @@ async function close(server) {
   await new Promise((resolve) => server.close(resolve));
 }
 
-module.exports = { auth, close, listen, withTempHome, writeAsarHeaderFixture };
+module.exports = { auth, workspaceAuth, close, listen, withTempHome, writeAsarHeaderFixture };

@@ -13,7 +13,7 @@ RESOURCE_ROOT="$APP_PATH/Contents/Resources/CodexAccountSwitcher_CodexAccountSwi
 }
 plutil -lint "$APP_PATH/Contents/Info.plist"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-for relative in cdp-helper/cli.js runtime/account-service.js runtime/codex-login.js locales/messages.json; do
+for relative in cdp-helper/cli.js runtime/account-service.js runtime/auth-identity.js runtime/codex-login.js locales/messages.json; do
   [[ -s "$RESOURCE_ROOT/$relative" ]] || {
     echo "Missing packaged resource: $relative" >&2
     exit 1

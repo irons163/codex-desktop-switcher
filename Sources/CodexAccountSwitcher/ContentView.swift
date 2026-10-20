@@ -90,7 +90,7 @@ struct ContentView: View {
                 List(state.accounts) { account in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(account.email ?? account.name)
+                            Text(account.displayLabel)
                                 .font(.body)
                             Text(account.name)
                                 .font(.caption)

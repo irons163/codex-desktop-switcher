@@ -72,3 +72,41 @@ test("failed New sign-in shows a visible error and leaves the account menu usabl
   assert.ok(buttons.every((button) => !button.disabled));
   assert.equal(actions.filter((action) => action === "new-sign-in").length, 2);
 });
+
+test("profile menu, current account, and settings distinguish workspaces sharing an email", async () => {
+  const renderer = fs.readFileSync(path.join(__dirname, "../Sources/CodexAccountSwitcher/Resources/cdp-helper/renderer-inject.js"), "utf8");
+  const source = renderer.replace("  installStyles();\n  document.addEventListener",
+    "  window.test = { renderPanel, renderAccountsState, activeAccountLabel }; return;\n  document.addEventListener");
+  const state = {
+    accounts: ["personal", "business"], current: "business",
+    accountEmails: { personal: "same@example.com", business: "same@example.com" },
+    accountLabels: { personal: "same@example.com · Plus · personal", business: "same@example.com · Business · business" },
+  };
+  const window = {
+    location: { href: "app://-/index.html" },
+    setTimeout(callback, timeout) { const timer = setTimeout(callback, timeout); timer.unref(); return timer; },
+  };
+  window.top = window;
+  window.__codexAccountSwitcherBridge = (raw) => {
+    const { id, message } = JSON.parse(raw);
+    queueMicrotask(() => window.__codexAccountSwitcherReceive(id,
+      message.action === "preferences" ? { ok: true, preferences: { language: "en" } } : { ok: true, state }));
+  };
+  vm.runInNewContext(source, {
+    window, URL, navigator: { language: "en" }, HTMLElement: Element, HTMLButtonElement: Element,
+    document: { createElement: (tag) => new Element(tag) },
+  });
+  const panel = new Element("div");
+  await window.test.renderPanel(panel);
+  const labels = panel.querySelectorAll("button").map((button) => button.textContent);
+  assert.ok(labels.some((label) => label.includes(state.accountLabels.personal)));
+  assert.ok(labels.some((label) => label.includes(state.accountLabels.business)));
+  assert.equal(window.test.activeAccountLabel(state), state.accountLabels.business);
+
+  const active = new Element("div");
+  const list = new Element("div");
+  window.test.renderAccountsState({ querySelector: (selector) => selector.endsWith("active]") ? active : list }, state);
+  assert.ok(list.textContent.includes(state.accountLabels.personal));
+  assert.ok(list.textContent.includes(state.accountLabels.business));
+  assert.equal(active.textContent, state.accountLabels.business);
+});

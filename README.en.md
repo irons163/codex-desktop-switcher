@@ -7,12 +7,12 @@ app's profile menu and Accounts settings page. Built with SwiftUI.
 
 ## Download
 
-**Current release: [v0.1.2](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.2)**
+**Current release: [v0.1.3](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.3)**
 
 | Your Mac | Installer |
 | --- | --- |
-| Apple Silicon (M-series) | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.2/CodexAccountSwitcher-0.1.2-apple-silicon.dmg) |
-| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.2/CodexAccountSwitcher-0.1.2-intel.dmg) |
+| Apple Silicon (M-series) | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.3/CodexAccountSwitcher-0.1.3-apple-silicon.dmg) |
+| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.3/CodexAccountSwitcher-0.1.3-intel.dmg) |
 
 Both installers are signed with Developer ID and notarized by Apple. The
 [release page](https://github.com/irons163/codex-desktop-switcher/releases/latest)
@@ -41,9 +41,15 @@ Keep launching Codex through the switcher when you want the account interface.
 If it is missing, click **Launch** again and use **Refresh** to check the
 injection and bridge status. **Advanced → Reveal Logs** opens the log folder.
 
+Personal and business workspaces for the same email can be added separately.
+Choose the workspace during sign-in; the menu shows its plan and workspace
+identifier. Switching restores that workspace’s saved credentials. Logins
+overwritten by older versions need to be added again after updating.
+
 ## Features
 
 - Save multiple accounts and switch from the Codex profile menu or settings.
+- Keep personal and business workspaces separate using account and workspace IDs, even when they share an email.
 - Apply account changes through a full Codex restart.
 - Follow the system language or choose among 65 interface locales, including
   English and Traditional Chinese.
