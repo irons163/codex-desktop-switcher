@@ -44,6 +44,8 @@ async function injectTarget(target, accountService, logger = () => {}) {
   const session = await CdpSession.connect(websocketURL, accountService, logger);
   await session.send("Runtime.enable");
   await session.send("Page.enable");
+  const { frameTree } = await session.send("Page.getFrameTree");
+  session.setMainFrame(frameTree?.frame);
   try {
     await session.send("Runtime.removeBinding", { name: "__codexAccountSwitcherBridge" });
   } catch {}

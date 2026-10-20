@@ -2,6 +2,7 @@
 
 const fsp = require("node:fs/promises");
 const path = require("node:path");
+const { randomUUID } = require("node:crypto");
 const { accountPath, normalizeAccountName, pathExists } = require("./account-paths");
 const { emailFromAuthString } = require("./auth-email");
 
@@ -34,8 +35,9 @@ async function saveCurrentAccount(paths, rawName) {
   if (!(await pathExists(paths.AUTH_PATH))) {
     throw new Error(`No active Codex auth file found at ${paths.AUTH_PATH}`);
   }
-  await fsp.mkdir(paths.ACCOUNTS_DIR, { recursive: true });
-  await fsp.copyFile(paths.AUTH_PATH, accountPath(paths, name));
+  await ensurePrivateStorage(paths);
+  await fsp.chmod(paths.AUTH_PATH, 0o600);
+  await copyPrivateAuth(paths.AUTH_PATH, accountPath(paths, name));
   await fsp.writeFile(paths.CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return readState(paths);
 }
@@ -45,8 +47,8 @@ async function switchAccount(paths, rawName) {
   const source = accountPath(paths, name);
   if (!(await pathExists(source))) throw new Error(`Saved account not found: ${name}`);
   const authJson = await fsp.readFile(source, "utf8");
-  await fsp.mkdir(paths.CODEX_DIR, { recursive: true });
-  await fsp.writeFile(paths.AUTH_PATH, authJson, "utf8");
+  await ensurePrivateStorage(paths);
+  await writePrivateAuth(paths.AUTH_PATH, authJson);
   await fsp.writeFile(paths.CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return readState(paths);
 }
@@ -69,10 +71,10 @@ async function startNewLogin(paths) {
 }
 
 async function clearActiveAuth(paths) {
-  await fsp.mkdir(paths.CODEX_DIR, { recursive: true });
+  await ensurePrivateStorage(paths);
   if (await pathExists(paths.AUTH_PATH)) {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    await fsp.copyFile(paths.AUTH_PATH, path.join(paths.CODEX_DIR, `auth.account-switcher-backup-${stamp}.json`));
+    await copyPrivateAuth(paths.AUTH_PATH, path.join(paths.CODEX_DIR, `auth.account-switcher-backup-${stamp}.json`));
     await fsp.rm(paths.AUTH_PATH, { force: true });
   }
   await fsp.rm(paths.CURRENT_NAME_PATH, { force: true });
@@ -81,6 +83,8 @@ async function clearActiveAuth(paths) {
 
 async function ensureAutosavedActiveAccount(paths) {
   if (!(await pathExists(paths.AUTH_PATH))) return null;
+  await ensurePrivateStorage(paths);
+  await fsp.chmod(paths.AUTH_PATH, 0o600);
   const accounts = await listAccountNames(paths);
   const matched = await findMatchingAccountByContents(paths, accounts);
   if (matched) {
@@ -91,16 +95,36 @@ async function ensureAutosavedActiveAccount(paths) {
   const active = await fsp.readFile(paths.AUTH_PATH, "utf8");
   const sameEmail = await findMatchingAccountByEmail(paths, accounts, active);
   if (sameEmail) {
-    await fsp.copyFile(paths.AUTH_PATH, accountPath(paths, sameEmail));
+    await copyPrivateAuth(paths.AUTH_PATH, accountPath(paths, sameEmail));
     await fsp.writeFile(paths.CURRENT_NAME_PATH, `${sameEmail}\n`, "utf8");
     return sameEmail;
   }
 
-  await fsp.mkdir(paths.ACCOUNTS_DIR, { recursive: true });
   const name = await nextAvailableAccountName(paths, "account");
-  await fsp.copyFile(paths.AUTH_PATH, accountPath(paths, name));
+  await copyPrivateAuth(paths.AUTH_PATH, accountPath(paths, name));
   await fsp.writeFile(paths.CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return name;
+}
+
+async function ensurePrivateStorage(paths) {
+  for (const directory of [paths.CODEX_DIR, paths.ACCOUNTS_DIR]) {
+    await fsp.mkdir(directory, { recursive: true, mode: 0o700 });
+    await fsp.chmod(directory, 0o700);
+  }
+}
+
+async function copyPrivateAuth(source, destination) {
+  await writePrivateAuth(destination, await fsp.readFile(source));
+}
+
+async function writePrivateAuth(destination, contents) {
+  const temporary = path.join(path.dirname(destination), `.account-switcher-${randomUUID()}.tmp`);
+  try {
+    await fsp.writeFile(temporary, contents, { flag: "wx", mode: 0o600 });
+    await fsp.rename(temporary, destination);
+  } finally {
+    await fsp.rm(temporary, { force: true });
+  }
 }
 
 async function listAccountNames(paths) {

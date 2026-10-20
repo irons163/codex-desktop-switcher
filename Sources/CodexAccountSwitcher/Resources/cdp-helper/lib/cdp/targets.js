@@ -32,9 +32,18 @@ function pickCodexTarget(targets) {
 function codexPageTargets(targets) {
   return targets.filter((target) => {
     if (target.type !== "page" || !targetWebSocket(target)) return false;
-    const url = String(target.url || "");
-    return url.startsWith("app://-/index.html");
+    return isCodexAppURL(target.url);
   });
 }
 
-module.exports = { codexPageTargets, pickCodexTarget, targetWebSocket };
+function isCodexAppURL(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "app:" && url.host === "-"
+      && !url.username && !url.password && url.pathname === "/index.html";
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { codexPageTargets, isCodexAppURL, pickCodexTarget, targetWebSocket };

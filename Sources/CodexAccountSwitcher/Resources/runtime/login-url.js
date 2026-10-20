@@ -8,6 +8,10 @@ function accountChooserURL(rawUrl) {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Only http(s) login URLs are supported.");
   }
+  if (url.protocol !== "https:" || url.hostname !== "auth.openai.com"
+    || url.port || url.username || url.password) {
+    throw new Error("Only official OpenAI HTTPS sign-in URLs are supported.");
+  }
   url.searchParams.delete("prompt");
   url.searchParams.set("max_age", "0");
   return url.toString();

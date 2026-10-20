@@ -55,7 +55,8 @@ public final class AccountStore {
         guard fileManager.fileExists(atPath: authPath.path) else {
             throw AccountStoreError.missingActiveAuth(authPath)
         }
-        try fileManager.createDirectory(at: accountsDirectory, withIntermediateDirectories: true)
+        try preparePrivateDirectories()
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: authPath.path)
         try replaceFile(at: accountPath(name), withContentsOf: authPath)
         try "\(name)\n".write(to: currentAccountPath, atomically: true, encoding: .utf8)
         return try readState()
@@ -68,7 +69,7 @@ public final class AccountStore {
         guard fileManager.fileExists(atPath: source.path) else {
             throw AccountStoreError.missingSavedAccount(name)
         }
-        try fileManager.createDirectory(at: codexDirectory, withIntermediateDirectories: true)
+        try preparePrivateDirectories()
         try replaceFile(at: authPath, withContentsOf: source)
         try "\(name)\n".write(to: currentAccountPath, atomically: true, encoding: .utf8)
         return try readState()
@@ -86,7 +87,7 @@ public final class AccountStore {
 
     @discardableResult
     public func clearActiveAuthForNewSignIn() throws -> AccountState {
-        try fileManager.createDirectory(at: codexDirectory, withIntermediateDirectories: true)
+        try preparePrivateDirectories()
         if fileManager.fileExists(atPath: authPath.path) {
             let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
             let backup = codexDirectory.appendingPathComponent("auth.account-switcher-backup-\(stamp).json")
@@ -139,6 +140,8 @@ public final class AccountStore {
         guard fileManager.fileExists(atPath: authPath.path) else {
             return nil
         }
+        try preparePrivateDirectories()
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: authPath.path)
         let accounts = try listAccountNames()
         if let matched = try findMatchingAccountByContents(accounts) {
             try "\(matched)\n".write(to: currentAccountPath, atomically: true, encoding: .utf8)
@@ -152,7 +155,6 @@ public final class AccountStore {
             return sameEmail
         }
 
-        try fileManager.createDirectory(at: accountsDirectory, withIntermediateDirectories: true)
         let name = try nextAvailableAccountName(baseName: "account")
         try replaceFile(at: accountPath(name), withContentsOf: authPath)
         try "\(name)\n".write(to: currentAccountPath, atomically: true, encoding: .utf8)
@@ -279,10 +281,19 @@ public final class AccountStore {
     }
 
     private func replaceFile(at destination: URL, withContentsOf source: URL) throws {
-        if fileManager.fileExists(atPath: destination.path) {
-            try fileManager.removeItem(at: destination)
+        try Data(contentsOf: source).write(to: destination, options: .atomic)
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+    }
+
+    private func preparePrivateDirectories() throws {
+        for directory in [codexDirectory, accountsDirectory] {
+            try fileManager.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         }
-        try fileManager.copyItem(at: source, to: destination)
     }
 }
 

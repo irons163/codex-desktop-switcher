@@ -4,3 +4,12 @@ dist/
 node_modules/
 *.xcodeproj/
 .DS_Store
+.env
+.env.*
+*.p8
+*.p12
+*.pfx
+*.key
+auth.json
+auth_accounts/
+auth.account-switcher-backup-*.json

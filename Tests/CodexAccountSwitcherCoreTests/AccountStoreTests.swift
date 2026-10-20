@@ -2,6 +2,30 @@ import XCTest
 @testable import CodexAccountSwitcherCore
 
 final class AccountStoreTests: XCTestCase {
+    func testAuthSnapshotsAndBackupsUsePrivatePermissions() throws {
+        try withTemporaryHome { home in
+            let store = AccountStore(homeDirectory: home)
+            try store.fileManager.createDirectory(at: store.codexDirectory, withIntermediateDirectories: true)
+            try auth(email: "work@example.com", profile: "work").write(to: store.authPath, atomically: true, encoding: .utf8)
+            try store.fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: store.authPath.path)
+            _ = try store.saveCurrentAccount(named: "work")
+            for directory in [store.codexDirectory, store.accountsDirectory] {
+                let permissions = try store.fileManager.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber
+                XCTAssertEqual(permissions?.intValue, 0o700)
+            }
+            for file in [store.authPath, store.accountPath("work")] {
+                let permissions = try store.fileManager.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber
+                XCTAssertEqual(permissions?.intValue, 0o600)
+            }
+            _ = try store.clearActiveAuthForNewSignIn()
+            let backup = try store.fileManager.contentsOfDirectory(at: store.codexDirectory, includingPropertiesForKeys: nil)
+                .first { $0.lastPathComponent.hasPrefix("auth.account-switcher-backup-") }
+            let file = try XCTUnwrap(backup)
+            let permissions = try store.fileManager.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber
+            XCTAssertEqual(permissions?.intValue, 0o600)
+        }
+    }
+
     func testAccountNameValidationAcceptsSafeNamesAndRejectsUnsafeNames() throws {
         XCTAssertEqual(try AccountName.normalize("work.main-2"), "work.main-2")
         XCTAssertEqual(try AccountName.normalize("personal_json.json"), "personal_json")
@@ -10,6 +34,21 @@ final class AccountStoreTests: XCTestCase {
         XCTAssertThrowsError(try AccountName.normalize("-starts-with-dash"))
         XCTAssertThrowsError(try AccountName.normalize("has space"))
         XCTAssertThrowsError(try AccountName.normalize(""))
+    }
+
+    func testSavingAuthReplacesSymlinkWithoutChangingItsTarget() throws {
+        try withTemporaryHome { home in
+            let store = AccountStore(homeDirectory: home)
+            try store.fileManager.createDirectory(at: store.accountsDirectory, withIntermediateDirectories: true)
+            try auth(email: "work@example.com", profile: "work").write(to: store.authPath, atomically: true, encoding: .utf8)
+            let unrelated = home.appendingPathComponent("unrelated.txt")
+            try "preserve me".write(to: unrelated, atomically: true, encoding: .utf8)
+            try store.fileManager.createSymbolicLink(at: store.accountPath("work"), withDestinationURL: unrelated)
+            _ = try store.saveCurrentAccount(named: "work")
+            XCTAssertEqual(try String(contentsOf: unrelated, encoding: .utf8), "preserve me")
+            let attributes = try store.fileManager.attributesOfItem(atPath: store.accountPath("work").path)
+            XCTAssertEqual(attributes[.type] as? FileAttributeType, .typeRegular)
+        }
     }
 
     func testEmailExtractionReadsDirectFieldsAndJWTIdToken() throws {

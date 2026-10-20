@@ -7,6 +7,11 @@ Download the signed, Apple-notarized Apple Silicon or Intel installer from
 Requires macOS 13 or later and an installed Codex or compatible ChatGPT desktop
 app. Install Node.js 22 or later if the desktop app does not bundle Node.js.
 
+Account snapshots contain local authentication credentials. See
+[SECURITY.md](SECURITY.md) for the trust boundary and
+[the pre-publication security review](docs/security-review-2026-10-20.md) for the
+checks performed before this repository became public.
+
 ## Screenshots
 
 Screenshots use placeholder accounts (`@example.com`) for demo purposes.

@@ -1,5 +1,7 @@
 "use strict";
 
+const { isCodexAppURL } = require("./targets");
+
 class CdpSession {
   constructor(socket, accountService, logger) {
     this.socket = socket;
@@ -8,6 +10,8 @@ class CdpSession {
     this.nextId = 1;
     this.pending = new Map();
     this.closed = false;
+    this.contexts = new Map();
+    this.mainFrameId = null;
     socket.addEventListener("message", (event) => this.handleMessage(event));
     socket.addEventListener("close", () => {
       this.closed = true;
@@ -56,6 +60,24 @@ class CdpSession {
       return;
     }
 
+    if (message.method === "Runtime.executionContextCreated") {
+      const context = message.params?.context;
+      if (context) this.contexts.set(context.id, context.auxData || {});
+      return;
+    }
+    if (message.method === "Runtime.executionContextDestroyed") {
+      this.contexts.delete(message.params?.executionContextId);
+      return;
+    }
+    if (message.method === "Runtime.executionContextsCleared") {
+      this.contexts.clear();
+      return;
+    }
+    if (message.method === "Page.frameNavigated" && !message.params?.frame?.parentId) {
+      this.setMainFrame(message.params?.frame);
+      return;
+    }
+
     if (message.id && this.pending.has(message.id)) {
       const pending = this.pending.get(message.id);
       this.pending.delete(message.id);
@@ -66,8 +88,14 @@ class CdpSession {
     }
 
     if (message.method === "Runtime.bindingCalled" && message.params?.name === "__codexAccountSwitcherBridge") {
+      const context = this.contexts.get(message.params.executionContextId);
+      if (!this.mainFrameId || !context?.isDefault || context.frameId !== this.mainFrameId) return;
       await this.handleBridgeCall(message.params.payload);
     }
+  }
+
+  setMainFrame(frame) {
+    this.mainFrameId = isCodexAppURL(frame?.url) ? frame.id : null;
   }
 
   async handleBridgeCall(rawPayload) {

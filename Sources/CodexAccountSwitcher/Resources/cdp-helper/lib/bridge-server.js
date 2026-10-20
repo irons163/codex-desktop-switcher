@@ -18,7 +18,7 @@ const {
   clearCodexBrowserLoginState,
   codexBrowserSessionPaths,
 } = require("./bridge/browser-session");
-const { writeJSON } = require("./bridge/http-server");
+const { isTrustedBridgeRequest, writeJSON } = require("./bridge/http-server");
 const { createBridgeState } = require("./bridge/state");
 
 async function serveBridge(options) {
@@ -98,6 +98,10 @@ async function serveBridge(options) {
   });
 
   async function handleRequest(request, response) {
+    if (!isTrustedBridgeRequest(request, options.bridgePort)) {
+      writeJSON(response, 403, { ok: false, error: { message: "Only local native clients may control the bridge." } });
+      return;
+    }
     if (request.method === "GET" && request.url === "/status") {
       writeJSON(response, 200, await bridgeStatus());
       return;

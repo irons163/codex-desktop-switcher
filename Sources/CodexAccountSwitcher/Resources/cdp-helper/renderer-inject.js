@@ -1,6 +1,10 @@
 "use strict";
 
 (() => {
+  const pageURL = new URL(window.location.href);
+  if (window.top !== window || pageURL.protocol !== "app:" || pageURL.host !== "-"
+    || pageURL.pathname !== "/index.html") return;
+
   if (typeof window.__codexAccountSwitcherCleanup === "function") {
     try {
       window.__codexAccountSwitcherCleanup();
@@ -151,6 +155,10 @@
       }
     } catch {}
     return Array.from(urls)
+      .filter((value) => {
+        const url = new URL(value);
+        return url.protocol === "app:" && url.host === "-" && !url.username && !url.password;
+      })
       .filter((url) => /\/(?:webview\/)?assets\/.+\.js(?:$|\?)/.test(url))
       .sort((a, b) => {
         const aMain = /\/(?:app-main|index)-/.test(a) ? 0 : 1;
