@@ -27,6 +27,7 @@ jobs:
     outputs:
       release_tag: ${{ steps.release.outputs.release_tag }}
       release_version: ${{ steps.release.outputs.release_version }}
+      release_id: ${{ steps.release.outputs.release_id }}
       source_sha: ${{ steps.release.outputs.source_sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -49,7 +50,11 @@ jobs:
           SOURCE_SHA="$(git rev-parse HEAD)"
           test "$SOURCE_SHA" = "$(git rev-list -n 1 "$RELEASE_TAG")"
           git merge-base --is-ancestor "$SOURCE_SHA" "origin/$DEFAULT_BRANCH"
-          RELEASE_JSON="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          # The tag endpoint only returns published releases. List releases so
+          # workflow_dispatch can build a draft before publishing its assets.
+          RELEASE_JSON="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"$RELEASE_TAG\")")"
+          RELEASE_ID="$(jq -er '.id' <<< "$RELEASE_JSON")"
           IS_PRERELEASE="$(jq -r '.prerelease' <<< "$RELEASE_JSON")"
           if [[ "$RELEASE_TAG" == *-* && "$IS_PRERELEASE" != true ]] || \
              [[ "$RELEASE_TAG" != *-* && "$IS_PRERELEASE" == true ]]; then
@@ -77,6 +82,7 @@ jobs:
           {
             echo "release_tag=$RELEASE_TAG"
             echo "release_version=${RELEASE_TAG#v}"
+            echo "release_id=$RELEASE_ID"
             echo "source_sha=$SOURCE_SHA"
           } >> "$GITHUB_OUTPUT"
 
@@ -214,6 +220,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
           RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
         run: |
           set -euo pipefail
           cd collected-artifacts
@@ -229,7 +236,7 @@ jobs:
           sha256sum --check SHA256SUMS
           gh release upload "$RELEASE_TAG" "${ASSETS[@]}" SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" --clobber
-          IS_DRAFT="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq '.draft')"
+          IS_DRAFT="$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" --jq '.draft')"
           if [[ "$IS_DRAFT" == true ]]; then
             gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
           fi
