@@ -1,48 +1,41 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CONFIG="${CONFIGURATION:-release}"
-APP="$ROOT/dist/CodexAccountSwitcher.app"
-BINARY="$ROOT/.build/$CONFIG/CodexAccountSwitcher"
-RESOURCE_BUNDLE="$ROOT/.build/$CONFIG/CodexAccountSwitcher_CodexAccountSwitcher.bundle"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIGURATION="${CONFIGURATION:-release}"
+TARGET_ARCH="${TARGET_ARCH:-$(uname -m)}"
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
+APP_PATH="$PROJECT_ROOT/dist/CodexAccountSwitcher.app"
+STAGING_PATH="$PROJECT_ROOT/dist/.CodexAccountSwitcher.app.staging"
 
-cd "$ROOT"
-swift build -c "$CONFIG"
+case "$CONFIGURATION" in
+  debug|release) ;;
+  *) echo "CONFIGURATION must be debug or release." >&2; exit 1 ;;
+esac
+case "$TARGET_ARCH" in
+  arm64|x86_64) ;;
+  *) echo "TARGET_ARCH must be arm64 or x86_64." >&2; exit 1 ;;
+esac
 
-rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BINARY" "$APP/Contents/MacOS/CodexAccountSwitcher"
-cp -R "$RESOURCE_BUNDLE" "$APP/CodexAccountSwitcher_CodexAccountSwitcher.bundle"
-cp "$ROOT/Assets/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+cd "$PROJECT_ROOT"
+swift build -c "$CONFIGURATION" --arch "$TARGET_ARCH" --product CodexAccountSwitcher
+BIN_DIR="$(swift build -c "$CONFIGURATION" --arch "$TARGET_ARCH" --show-bin-path)"
+RESOURCE_BUNDLE="$BIN_DIR/CodexAccountSwitcher_CodexAccountSwitcher.bundle"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key>
-  <string>CodexAccountSwitcher</string>
-  <key>CFBundleIdentifier</key>
-  <string>local.codex-account-switcher</string>
-  <key>CFBundleName</key>
-  <string>Codex Account Switcher</string>
-  <key>CFBundleDisplayName</key>
-  <string>Codex Account Switcher</string>
-  <key>CFBundleIconFile</key>
-  <string>AppIcon</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
-  <key>CFBundleVersion</key>
-  <string>1</string>
-  <key>LSMinimumSystemVersion</key>
-  <string>13.0</string>
-  <key>NSPrincipalClass</key>
-  <string>NSApplication</string>
-</dict>
-</plist>
-PLIST
+rm -rf "$STAGING_PATH"
+mkdir -p "$STAGING_PATH/Contents/MacOS" "$STAGING_PATH/Contents/Resources"
+cp "$BIN_DIR/CodexAccountSwitcher" "$STAGING_PATH/Contents/MacOS/CodexAccountSwitcher"
+ditto "$RESOURCE_BUNDLE" "$STAGING_PATH/Contents/Resources/$(basename "$RESOURCE_BUNDLE")"
+cp "$PROJECT_ROOT/Assets/AppIcon.icns" "$STAGING_PATH/Contents/Resources/AppIcon.icns"
+cp "$PROJECT_ROOT/Packaging/Info.plist" "$STAGING_PATH/Contents/Info.plist"
 
-echo "$APP"
+SIGN_ARGS=(--force --sign "$CODE_SIGN_IDENTITY")
+if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
+  SIGN_ARGS+=(--timestamp --options runtime)
+fi
+codesign "${SIGN_ARGS[@]}" "$STAGING_PATH"
+codesign --verify --deep --strict --verbose=2 "$STAGING_PATH"
+
+rm -rf "$APP_PATH"
+mv "$STAGING_PATH" "$APP_PATH"
+echo "$APP_PATH"

@@ -55,8 +55,9 @@ struct LocalizedText {
 enum LocalizationSupport {
     static let catalog: MessageCatalog = {
         let candidates = [
-            Bundle.module.url(forResource: "messages", withExtension: "json", subdirectory: "locales"),
-            Bundle.module.resourceURL?.appendingPathComponent("locales/messages.json"),
+            AppResources.bundle.url(forResource: "messages", withExtension: "json", subdirectory: "locales"),
+            AppResources.bundle.resourceURL?.appendingPathComponent("Resources/locales/messages.json"),
+            AppResources.bundle.resourceURL?.appendingPathComponent("locales/messages.json"),
             URL(fileURLWithPath: "Sources/CodexAccountSwitcher/Resources/locales/messages.json"),
         ].compactMap { $0 }
 

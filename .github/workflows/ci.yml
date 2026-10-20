@@ -1,0 +1,62 @@
+name: CI
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Select latest Xcode
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(find /Applications -maxdepth 1 -type d -name 'Xcode*.app' | sort -V | tail -n 1)"
+          test -n "$XCODE_APP"
+          echo "DEVELOPER_DIR=${XCODE_APP}/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Validate native runner and scripts
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          test "$(uname -m)" = "$TARGET_ARCH"
+          for script in scripts/*.sh; do bash -n "$script"; done
+          swift --version
+      - name: Run tests and checks
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+          npm run check
+          git diff --exit-code
+          swift test
+      - name: Package and verify app
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          scripts/package-app.sh
+          scripts/verify-app.sh

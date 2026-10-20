@@ -2,6 +2,11 @@
 
 Native macOS SwiftUI manager for launching Codex with an in-app account switcher.
 
+Download the signed, Apple-notarized Apple Silicon or Intel installer from
+[GitHub Releases](https://github.com/irons163/codex-desktop-switcher/releases/latest).
+Requires macOS 13 or later and an installed Codex or compatible ChatGPT desktop
+app. Install Node.js 22 or later if the desktop app does not bundle Node.js.
+
 ## Screenshots
 
 Screenshots use placeholder accounts (`@example.com`) for demo purposes.
@@ -59,6 +64,54 @@ To produce a double-clickable app bundle:
 scripts/package-app.sh
 open dist/CodexAccountSwitcher.app
 ```
+
+Local packages use an ad-hoc signature. Set `TARGET_ARCH=arm64` or
+`TARGET_ARCH=x86_64` to select an architecture and run `scripts/verify-app.sh`
+to check the bundle, signature, and helper CLI. Set `CODE_SIGN_IDENTITY` to a
+Developer ID Application identity for a distribution signature.
+
+## Releases
+
+GitHub Actions follows the same native Apple Silicon / Intel build and
+Developer ID notarization flow as `codex-theme-switcher`. CI runs the Swift and
+Node tests, syntax checks, and packaged-app verification on both architectures.
+The release workflow uploads two signed, notarized DMGs, matching dSYM archives,
+and `SHA256SUMS` only after both builds succeed. It retries transient Apple
+ticket-delivery failures while keeping notarization and Gatekeeper checks
+mandatory.
+
+Configure these secrets in the repository's `release-production` environment:
+
+```text
+APPLE_CERTIFICATE_P12_BASE64
+APPLE_CERTIFICATE_PASSWORD
+KEYCHAIN_PASSWORD
+APPLE_TEAM_ID
+APPLE_API_KEY_ID
+APPLE_API_ISSUER_ID
+APPLE_API_PRIVATE_KEY_BASE64
+```
+
+Before releasing, update `CFBundleShortVersionString` and `CFBundleVersion` in
+`Packaging/Info.plist`, keep `package.json` and `package-lock.json` versions in
+sync, and add `docs/release-notes/v<VERSION>.md`. Commit and push those changes
+to `main`.
+
+Create a draft release at that commit, then dispatch the release workflow:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+gh release create v0.1.0 --verify-tag --draft \
+  --title 'Codex Account Switcher 0.1.0' \
+  --notes-file docs/release-notes/v0.1.0.md
+gh workflow run release.yml --ref main -f release_tag=v0.1.0
+```
+
+The workflow publishes the draft after uploading all verified assets. Publishing
+a release directly also triggers the workflow. To retry an existing release,
+dispatch `release.yml` with its `release_tag`; the workflow rebuilds the exact
+tagged commit and replaces the matching assets.
 
 ## Commands
 

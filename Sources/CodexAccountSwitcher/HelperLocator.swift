@@ -29,7 +29,7 @@ enum HelperLocator {
     }
 
     static func helperScriptURL() throws -> URL {
-        let resourceURL = Bundle.module.resourceURL
+        let resourceURL = AppResources.bundle.resourceURL
         let candidates: [URL?] = [
             resourceURL?.appendingPathComponent("Resources/cdp-helper/cli.js"),
             resourceURL?.appendingPathComponent("cdp-helper/cli.js"),
