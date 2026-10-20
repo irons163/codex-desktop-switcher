@@ -23,13 +23,13 @@ async function openAccountChooserURL(rawUrl, opener = openExternalURL) {
   return url;
 }
 
-function openExternalURL(url) {
+function openExternalURL(url, spawn = childProcess.spawn) {
   return new Promise((resolve, reject) => {
-    const child = childProcess.spawn("open", [url], { detached: true, stdio: "ignore" });
+    const child = spawn("/usr/bin/open", [url], { stdio: "ignore" });
     child.once("error", reject);
-    child.once("spawn", () => {
-      child.unref();
-      resolve();
+    child.once("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error("Could not open the sign-in browser. Check your default browser and try again."));
     });
   });
 }

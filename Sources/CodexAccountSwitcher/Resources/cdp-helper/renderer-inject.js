@@ -114,8 +114,6 @@
   let nativeSettingsPageRoot = null;
   let nativeSettingsContentHost = null;
   let nativeSettingsContentStash = null;
-  let activeNativeLoginAbortController = null;
-  const assetModuleCache = new Map();
 
   window.__codexAccountSwitcherReceive = (id, payload) => {
     const resolver = pending.get(id);
@@ -124,7 +122,7 @@
     resolver(payload);
   };
 
-  function invoke(message) {
+  function invoke(message, timeoutMs = 5000) {
     if (typeof window.__codexAccountSwitcherBridge !== "function") {
       return Promise.resolve({ ok: false, error: { message: t("bridgeOffline") } });
     }
@@ -136,145 +134,19 @@
         if (!pending.has(id)) return;
         pending.delete(id);
         resolve({ ok: false, error: { message: t("bridgeOffline") } });
-      }, 5000);
+      }, timeoutMs);
     });
   }
 
-  function escapeRegExp(value) {
-    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
-  function codexAssetScriptUrls() {
-    const urls = new Set();
-    for (const script of Array.from(document.scripts || [])) {
-      if (script.src) urls.add(new URL(script.src, document.baseURI).href);
-    }
-    try {
-      for (const entry of performance.getEntriesByType("resource")) {
-        if (entry?.name) urls.add(new URL(entry.name, document.baseURI).href);
-      }
-    } catch {}
-    return Array.from(urls)
-      .filter((value) => {
-        const url = new URL(value);
-        return url.protocol === "app:" && url.host === "-" && !url.username && !url.password;
-      })
-      .filter((url) => /\/(?:webview\/)?assets\/.+\.js(?:$|\?)/.test(url))
-      .sort((a, b) => {
-        const aMain = /\/(?:app-main|index)-/.test(a) ? 0 : 1;
-        const bMain = /\/(?:app-main|index)-/.test(b) ? 0 : 1;
-        return aMain - bMain || a.localeCompare(b);
-      });
-  }
-
-  function codexAssetBaseUrl() {
-    return codexAssetScriptUrls()[0] || new URL("/assets/index.js", window.location.href).href;
-  }
-
-  async function findBundledCodexAssetModule(modulePrefix) {
-    const result = await invoke({ action: "find-codex-asset", prefix: modulePrefix });
-    if (!result.ok || !result.asset?.fileName) return null;
-    return new URL(`./${result.asset.fileName}`, codexAssetBaseUrl()).href;
-  }
-
-  async function findCodexAssetModule(modulePrefix) {
-    if (assetModuleCache.has(modulePrefix)) return assetModuleCache.get(modulePrefix);
-    const pattern = new RegExp(`${escapeRegExp(`./${modulePrefix}`)}[^"'\\\\]+\\.js`);
-    for (const scriptUrl of codexAssetScriptUrls()) {
-      let source = "";
-      try {
-        const response = await fetch(scriptUrl);
-        if (!response.ok) continue;
-        source = await response.text();
-      } catch {
-        continue;
-      }
-      const match = source.match(pattern);
-      if (!match) continue;
-      const moduleUrl = new URL(match[0], scriptUrl).href;
-      assetModuleCache.set(modulePrefix, moduleUrl);
-      return moduleUrl;
-    }
-    const bundledModuleUrl = await findBundledCodexAssetModule(modulePrefix);
-    if (bundledModuleUrl) {
-      assetModuleCache.set(modulePrefix, bundledModuleUrl);
-      return bundledModuleUrl;
-    }
-    throw new Error(t("nativeLoginUnavailable"));
-  }
-
-  async function getCodexNativeChatGptLogin() {
-    const modulePrefixes = [
-      "chatgpt-desktop-auth-url-",
-      "onboarding-login-content-",
-    ];
-    for (const modulePrefix of modulePrefixes) {
-      try {
-        const moduleUrl = await findCodexAssetModule(modulePrefix);
-        const loginModule = await import(moduleUrl);
-        const startLogin = Object.values(loginModule).find((value) =>
-          typeof value === "function"
-          && /login-with-chatgpt/.test(Function.prototype.toString.call(value))
-        );
-        if (startLogin) return startLogin;
-        if (modulePrefix === "onboarding-login-content-" && typeof loginModule.r === "function") {
-          return loginModule.r;
-        }
-      } catch {}
-    }
-    throw new Error(t("nativeLoginUnavailable"));
+  async function startNewSignIn() {
+    const result = await invoke({ action: "new-sign-in" }, 25000);
+    if (!result.ok) throw new Error(result.error?.message || "Start login failed");
+    return result;
   }
 
   async function switchSavedAccount(name) {
     const result = await invoke({ action: "switch", name, relaunch: true });
     if (!result.ok) throw new Error(result.error?.message || "Switch failed");
-    return result;
-  }
-
-  async function openNativeLoginAuthUrl(loginResult) {
-    const authUrl = loginResult?.authUrl || loginResult?.auth_url;
-    if (!authUrl) throw new Error(t("missingAuthUrl"));
-    const opened = await invoke({ action: "open-url", url: authUrl });
-    if (!opened.ok) throw new Error(opened.error?.message || "Open login URL failed");
-    return opened;
-  }
-
-  function clearNativeLoginControllerWhenDone(controller, completion) {
-    if (!completion || typeof completion.finally !== "function") return;
-    completion.finally(() => {
-      if (activeNativeLoginAbortController === controller) activeNativeLoginAbortController = null;
-    }).catch(() => {});
-  }
-
-  async function startNewSignInWithNativeLogin() {
-    const startLogin = await getCodexNativeChatGptLogin();
-    if (activeNativeLoginAbortController) activeNativeLoginAbortController.abort();
-    const controller = new AbortController();
-    activeNativeLoginAbortController = controller;
-    let loginResult;
-    try {
-      loginResult = await startLogin({
-        signal: controller.signal,
-        useStreamlinedLogin: false,
-      });
-    } catch (error) {
-      if (/already in progress/i.test(error?.message || String(error))) {
-        throw new Error(t("loginAlreadyInProgress"));
-      }
-      throw error;
-    }
-    clearNativeLoginControllerWhenDone(controller, loginResult?.completion);
-    const result = await invoke({ action: "start-login", relaunch: false });
-    if (!result.ok) {
-      controller.abort();
-      throw new Error(result.error?.message || "Start login failed");
-    }
-    try {
-      await openNativeLoginAuthUrl(loginResult);
-    } catch (error) {
-      controller.abort();
-      throw error;
-    }
     return result;
   }
 
@@ -497,9 +369,22 @@
       await renderPanel(panel);
     }));
     panel.appendChild(menuButton(t("newSignIn"), async () => {
-      panel.textContent = t("openingSignIn");
-      await startNewSignInWithNativeLogin();
-      panel.textContent = t("newSignInDone");
+      const status = document.createElement("div");
+      status.setAttribute("role", "status");
+      status.textContent = t("openingSignIn");
+      panel.appendChild(status);
+      const buttons = Array.from(panel.querySelectorAll("button"));
+      buttons.forEach((button) => { button.disabled = true; });
+      try {
+        await startNewSignIn();
+        status.textContent = t("newSignInDone");
+      } catch (error) {
+        status.setAttribute("role", "alert");
+        status.textContent = error?.message || String(error);
+        status.style.color = "#ff6b6b";
+      } finally {
+        buttons.forEach((button) => { button.disabled = false; });
+      }
     }));
     panel.appendChild(menuButton(t("configure"), () => openAccountsSettings()));
   }
@@ -1039,7 +924,7 @@
       }
       if (command === "clear-active") {
         setStatus(page, t("openingSignIn"));
-        const result = await startNewSignInWithNativeLogin();
+        const result = await startNewSignIn();
         renderAccountsState(page, result.state);
         setStatus(page, t("newSignInDone"));
       }

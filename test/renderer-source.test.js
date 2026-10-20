@@ -33,7 +33,8 @@ test("renderer injection adds an Accounts page to native Codex Settings", () => 
 test("renderer new sign-in command starts the multi-account login flow", () => {
   const source = rendererInjectionSource();
 
-  assert.match(source, /action: "start-login"/);
+  assert.match(source, /action: "new-sign-in"/);
+  assert.match(source, /25000/);
 });
 
 test("renderer account popup exposes save and new sign-in actions directly", () => {
@@ -54,19 +55,13 @@ test("renderer account popup reports async action failures instead of swallowing
   assert.match(source, /Account Switcher.*menu action failed/);
 });
 
-test("renderer starts Codex native ChatGPT login after preparing a new account", () => {
+test("renderer delegates new sign-in to the local service without importing private desktop modules", () => {
   const source = rendererInjectionSource();
 
-  assert.match(source, /chatgpt-desktop-auth-url-/);
-  assert.match(source, /onboarding-login-content-/);
-  assert.match(source, /login-with-chatgpt/);
-  assert.match(source, /find-codex-asset/);
-  assert.match(source, /import\(/);
-  assert.match(source, /authUrl/);
-  assert.match(source, /action: "open-url"/);
-  assert.match(source, /AbortController/);
-  assert.match(source, /useStreamlinedLogin:\s*false/);
-  assert.match(source, /relaunch:\s*false/);
+  assert.match(source, /action: "new-sign-in"/);
+  assert.doesNotMatch(source, /chatgpt-desktop-auth-url-/);
+  assert.doesNotMatch(source, /onboarding-login-content-/);
+  assert.doesNotMatch(source, /import\(/);
 });
 
 test("renderer switch uses a real Codex relaunch because hot auth refresh is not reliable", () => {
@@ -78,19 +73,16 @@ test("renderer switch uses a real Codex relaunch because hot auth refresh is not
   assert.doesNotMatch(source, /softRefresh:\s*true/);
 });
 
-test("renderer gets a native login URL before clearing the active auth file", () => {
+test("renderer does not clear active auth during browser sign-in", () => {
   const source = rendererInjectionSource();
-  const loginIndex = source.indexOf("loginResult = await startLogin");
-  const clearIndex = source.indexOf('action: "start-login"');
-
-  assert.notEqual(loginIndex, -1);
-  assert.notEqual(clearIndex, -1);
-  assert.ok(loginIndex < clearIndex);
+  assert.doesNotMatch(source, /action: "start-login"/);
+  assert.doesNotMatch(source, /action: "clear-active"/);
 });
 
-test("renderer asset discovery supports current and legacy Codex asset roots", () => {
+test("renderer sign-in status remains attached to the panel on failure", () => {
   const source = rendererInjectionSource();
 
-  assert.match(source, /webview/);
-  assert.match(source, /\(\?:webview\\\/\)\?assets/);
+  assert.match(source, /panel\.appendChild\(status\)/);
+  assert.match(source, /status\.setAttribute\("role", "alert"\)/);
+  assert.match(source, /button\.disabled = false/);
 });

@@ -18,6 +18,7 @@ const {
 } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp");
 const { codexLaunchArgs: directCodexLaunchArgs } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp/launcher");
 const { codexMainProcessIds: directCodexMainProcessIds } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/cdp/processes");
+const { RUNTIME_VERSION } = require("../Sources/CodexAccountSwitcher/Resources/cdp-helper/lib/runtime-version");
 
 test("CDP launcher args enable local browser debugging without app patching", () => {
   assert.deepEqual(codexDebugArgs(57321), [
@@ -78,7 +79,7 @@ test("CLI launch waits for a Codex restart that takes longer than five seconds",
     const server = http.createServer((request, response) => {
       const reply = () => {
         response.writeHead(200, { "Content-Type": "application/json" });
-        response.end(JSON.stringify({ app: "codex-account-switcher", ok: true, status }));
+        response.end(JSON.stringify({ app: "codex-account-switcher", runtimeVersion: RUNTIME_VERSION, ok: true, status }));
       };
       if (request.method === "POST" && request.url === "/launch") {
         setTimeout(reply, 5500);

@@ -7,12 +7,12 @@ app's profile menu and Accounts settings page. Built with SwiftUI.
 
 ## Download
 
-**Current release: [v0.1.1](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.1)**
+**Current release: [v0.1.2](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.2)**
 
 | Your Mac | Installer |
 | --- | --- |
-| Apple Silicon (M-series) | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.1/CodexAccountSwitcher-0.1.1-apple-silicon.dmg) |
-| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.1/CodexAccountSwitcher-0.1.1-intel.dmg) |
+| Apple Silicon (M-series) | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.2/CodexAccountSwitcher-0.1.2-apple-silicon.dmg) |
+| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.2/CodexAccountSwitcher-0.1.2-intel.dmg) |
 
 Both installers are signed with Developer ID and notarized by Apple. The
 [release page](https://github.com/irons163/codex-desktop-switcher/releases/latest)
@@ -33,7 +33,8 @@ also includes `SHA256SUMS` and optional `.dSYM.zip` debugging symbols.
 3. In Codex, open the profile menu or **Settings → Accounts**. Use
    **Save current account** to name and save the current login.
 4. Use **New sign-in** to add another account. The current login is saved before
-   the new sign-in flow starts.
+   the new sign-in flow starts. Existing credentials stay active until the new
+   account finishes signing in; then the new account is saved and Codex restarts.
 5. Choose a saved account to switch. Codex restarts to apply that account.
 
 Keep launching Codex through the switcher when you want the account interface.

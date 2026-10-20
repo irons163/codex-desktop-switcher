@@ -8,6 +8,7 @@ const { codexAuthPaths, normalizeAccountName } = require("./account-paths");
 const { emailFromAuthString } = require("./auth-email");
 const { collectAsarFiles, findCodexAssetByPrefix } = require("./asar-assets");
 const { readPreferences, writePreferences } = require("./preferences");
+const { createCodexLogin } = require("./codex-login");
 
 function createAccountService(options = {}) {
   const home = options.home || os.homedir();
@@ -16,15 +17,26 @@ function createAccountService(options = {}) {
   const codexApp = options.codexApp || "/Applications/Codex.app";
   const userRoot = options.userRoot || path.join(home, "Library/Application Support/codex-account-switcher");
   const paths = codexAuthPaths(home);
+  const login = (options.createLogin || createCodexLogin)({
+    codexApp,
+    openURL,
+    onComplete: async () => {
+      await readState(paths);
+      relaunch({ forceRelaunch: true });
+    },
+    onError: (error) => options.onLoginError?.(error),
+  });
 
   return {
     paths,
+    dispose: () => login.cancel(),
     async handle(message = {}) {
       try {
         const action = message.action;
         if (action === "state") return ok({ state: await readState(paths) });
         if (action === "save") return ok({ state: await saveCurrentAccount(paths, message.name) });
         if (action === "switch") {
+          await login.cancel();
           const shouldRelaunch = message.relaunch !== false;
           const state = await switchAccount(paths, message.name);
           if (shouldRelaunch) setTimeout(() => relaunch({ forceRelaunch: true }), 250);
@@ -32,9 +44,15 @@ function createAccountService(options = {}) {
         }
         if (action === "delete") return ok({ state: await deleteAccount(paths, message.name) });
         if (action === "start-login") {
+          await login.cancel();
           const state = await startNewLogin(paths);
           if (message.relaunch !== false) setTimeout(() => relaunch({ clearBrowserSession: true }), 250);
           return ok({ state: { ...state, requiresAppRelaunch: true, requiresFreshLogin: true } });
+        }
+        if (action === "new-sign-in") {
+          await readState(paths); // Preserve the current account without clearing active auth.
+          const result = await login.start();
+          return ok({ ...result, state: await readState(paths, { autosave: false }) });
         }
         if (action === "find-codex-asset") {
           return ok({ asset: await findCodexAssetByPrefix(codexApp, message.prefix) });
@@ -43,6 +61,7 @@ function createAccountService(options = {}) {
           return ok({ openedUrl: await openAccountChooserURL(message.url, openURL) });
         }
         if (action === "clear-active") {
+          await login.cancel();
           const state = await clearActiveAuth(paths);
           if (message.relaunch !== false) setTimeout(relaunch, 250);
           return ok({ state: { ...state, requiresAppRelaunch: true } });

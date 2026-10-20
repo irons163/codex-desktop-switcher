@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { sleep } = require("./launcher");
+const { RUNTIME_VERSION } = require("../runtime-version");
 
 async function queryBridge(bridgePort, pathname = "/status", method = "GET", timeoutMs = 5000) {
   const response = await fetch(`http://127.0.0.1:${bridgePort}${pathname}`, {
@@ -26,13 +27,14 @@ async function queryBridge(bridgePort, pathname = "/status", method = "GET", tim
   return {};
 }
 
-async function waitForBridge(bridgePort, timeoutMs = 5000) {
+async function waitForBridge(bridgePort, timeoutMs = 5000, runtimeVersion = null) {
   const startedAt = Date.now();
   let lastError = null;
   while (Date.now() - startedAt < timeoutMs) {
     try {
       const status = await queryBridge(bridgePort);
-      if (status?.app === "codex-account-switcher") return status;
+      if (status?.app === "codex-account-switcher"
+        && (!runtimeVersion || status.runtimeVersion === runtimeVersion)) return status;
     } catch (error) {
       lastError = error;
     }
@@ -42,9 +44,22 @@ async function waitForBridge(bridgePort, timeoutMs = 5000) {
 }
 
 async function startBridgeDaemon(options) {
+  let current = null;
   try {
-    return await waitForBridge(options.bridgePort, 500);
+    current = await waitForBridge(options.bridgePort, 500);
   } catch {}
+  if (current?.runtimeVersion === RUNTIME_VERSION) return current;
+  if (current) {
+    await queryBridge(options.bridgePort, "/stop", "POST");
+    const stoppedAt = Date.now();
+    let stopped = false;
+    while (Date.now() - stoppedAt < 5000) {
+      try { await queryBridge(options.bridgePort); }
+      catch { stopped = true; break; }
+      await sleep(100);
+    }
+    if (!stopped) throw new Error("The previous switcher bridge could not stop. Quit it and try Launch again.");
+  }
 
   await fsp.mkdir(path.join(options.userRoot, "log"), { recursive: true });
   const logPath = path.join(options.userRoot, "log", "bridge.log");
@@ -65,7 +80,7 @@ async function startBridgeDaemon(options) {
   });
   child.unref();
   fs.closeSync(logFd);
-  return waitForBridge(options.bridgePort, 5000);
+  return waitForBridge(options.bridgePort, 5000, RUNTIME_VERSION);
 }
 
 module.exports = { queryBridge, startBridgeDaemon, waitForBridge };

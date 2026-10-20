@@ -7,12 +7,12 @@
 
 ## 下載
 
-**目前版本：[v0.1.1](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.1)**
+**目前版本：[v0.1.2](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.2)**
 
 | Mac 類型 | 安裝檔 |
 | --- | --- |
-| Apple Silicon（M 系列） | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.1/CodexAccountSwitcher-0.1.1-apple-silicon.dmg) |
-| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.1/CodexAccountSwitcher-0.1.1-intel.dmg) |
+| Apple Silicon（M 系列） | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.2/CodexAccountSwitcher-0.1.2-apple-silicon.dmg) |
+| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.2/CodexAccountSwitcher-0.1.2-intel.dmg) |
 
 兩種安裝檔均使用 Developer ID 簽名並通過 Apple 公證。
 [發布頁面](https://github.com/irons163/codex-desktop-switcher/releases/latest)
@@ -33,7 +33,7 @@
 3. 在 Codex 開啟個人選單，或進入 **設定 → 帳號（Settings → Accounts）**。
    使用 **儲存目前帳號（Save current account）** 為目前登入命名並儲存。
 4. 使用 **新增登入（New sign-in）** 加入其他帳號。
-   工具會先儲存目前登入，再開始新的登入流程。
+   工具會先儲存目前帳號，並保留原本登入；新帳號在瀏覽器完成登入後，會自動儲存並重新啟動 Codex。
 5. 選擇已儲存的帳號進行切換，Codex 會重新啟動並套用該帳號。
 
 之後需要帳號切換介面時，請透過切換器啟動 Codex。

@@ -20,6 +20,7 @@ const {
 } = require("./bridge/browser-session");
 const { isTrustedBridgeRequest, writeJSON } = require("./bridge/http-server");
 const { createBridgeState } = require("./bridge/state");
+const { RUNTIME_VERSION } = require("./runtime-version");
 
 async function serveBridge(options) {
   fs.mkdirSync(path.join(options.userRoot, "log"), { recursive: true });
@@ -42,6 +43,10 @@ async function serveBridge(options) {
     relaunch,
     codexApp: options.codexApp,
     userRoot: options.userRoot,
+    onLoginError: (error) => {
+      state.lastError = error.message;
+      log(`sign-in failed: ${state.lastError}`);
+    },
   });
 
   async function injectOnce() {
@@ -80,6 +85,7 @@ async function serveBridge(options) {
     const injected = state.activeSessionCount() > 0;
     return {
       app: "codex-account-switcher",
+      runtimeVersion: RUNTIME_VERSION,
       ok: true,
       injected,
       injectedAt: state.injectedAt,
@@ -117,6 +123,7 @@ async function serveBridge(options) {
       return;
     }
     if (request.method === "POST" && request.url === "/stop") {
+      await service.dispose();
       writeJSON(response, 200, { app: "codex-account-switcher", ok: true, stopped: true });
       server.close(() => process.exit(0));
       return;
