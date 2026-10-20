@@ -21,6 +21,9 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # GitHub requires repository write access to read unpublished releases.
+    permissions:
+      contents: write
     outputs:
       release_tag: ${{ steps.release.outputs.release_tag }}
       release_version: ${{ steps.release.outputs.release_version }}
