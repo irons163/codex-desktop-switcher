@@ -1,89 +1,152 @@
 # Codex Account Switcher
 
-Native macOS SwiftUI manager for launching Codex with an in-app account switcher.
+**English** | [繁體中文](README.zh-Hant.md)
 
-Download the signed, Apple-notarized Apple Silicon or Intel installer from
-[GitHub Releases](https://github.com/irons163/codex-desktop-switcher/releases/latest).
-Requires macOS 13 or later and an installed Codex or compatible ChatGPT desktop
-app. Install Node.js 22 or later if the desktop app does not bundle Node.js.
+A native macOS app for saving and switching Codex accounts from the desktop
+app's profile menu and Accounts settings page. Built with SwiftUI.
 
-Account snapshots contain local authentication credentials. See
-[SECURITY.md](SECURITY.md) for the trust boundary and
-[the pre-publication security review](docs/security-review-2026-10-20.md) for the
-checks performed before this repository became public.
+## Download
+
+**Current release: [v0.1.1](https://github.com/irons163/codex-desktop-switcher/releases/tag/v0.1.1)**
+
+| Your Mac | Installer |
+| --- | --- |
+| Apple Silicon (M-series) | [Apple Silicon DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.1/CodexAccountSwitcher-0.1.1-apple-silicon.dmg) |
+| Intel | [Intel DMG](https://github.com/irons163/codex-desktop-switcher/releases/download/v0.1.1/CodexAccountSwitcher-0.1.1-intel.dmg) |
+
+Both installers are signed with Developer ID and notarized by Apple. The
+[release page](https://github.com/irons163/codex-desktop-switcher/releases/latest)
+also includes `SHA256SUMS` and optional `.dSYM.zip` debugging symbols.
+
+### Requirements
+
+- macOS 13 or later.
+- An installed Codex desktop app or compatible unified ChatGPT desktop app.
+- Node.js 22 or later if the desktop app does not bundle Node.js.
+
+## Install and use
+
+1. Download the DMG for your Mac, open it, and drag **Codex Account Switcher**
+   into **Applications**.
+2. Open the switcher and click **Launch**. Codex may restart to enable the
+   account interface; launch can take up to 60 seconds.
+3. In Codex, open the profile menu or **Settings → Accounts**. Use
+   **Save current account** to name and save the current login.
+4. Use **New sign-in** to add another account. The current login is saved before
+   the new sign-in flow starts.
+5. Choose a saved account to switch. Codex restarts to apply that account.
+
+Keep launching Codex through the switcher when you want the account interface.
+If it is missing, click **Launch** again and use **Refresh** to check the
+injection and bridge status. **Advanced → Reveal Logs** opens the log folder.
+
+## Features
+
+- Save multiple accounts and switch from the Codex profile menu or settings.
+- Apply account changes through a full Codex restart.
+- Follow the system language or choose among 65 interface locales, including
+  English and Traditional Chinese.
+- Support both Codex and compatible unified ChatGPT desktop installations.
+- Add the account interface at runtime through a local Chromium DevTools
+  Protocol (CDP) connection, without modifying or re-signing the installed app.
 
 ## Screenshots
 
-Screenshots use placeholder accounts (`@example.com`) for demo purposes.
+These are illustrative mockups using placeholder accounts (`@example.com`).
+The surrounding Codex interface may vary by desktop app version.
 
 ### Launcher
 
 ![Codex Account Switcher launcher](docs/screenshots/launcher-mockup.png)
 
-### In-Codex settings
+### Accounts settings
 
-![Accounts settings page injected into Codex](docs/screenshots/codex-accounts-mockup.png)
+![Accounts settings page inside Codex](docs/screenshots/codex-accounts-mockup.png)
 
 ### Profile menu
 
-![Account switcher menu in the Codex profile dropdown](docs/screenshots/codex-menu-mockup.png)
+![Account switcher in the Codex profile menu](docs/screenshots/codex-menu-mockup.png)
 
-This version does **not** modify `/Applications/Codex.app`. It starts Codex with a
-local Chromium DevTools Protocol port, keeps a small local bridge process alive,
-and injects the account UI into the Codex renderer at runtime.
+## Security and local data
 
-The bridge stores logs and runtime state in:
+Account snapshots and backups contain plaintext authentication credentials.
+The switcher uses owner-only permissions for its credential directories and
+files; keep your macOS account and backups protected.
 
-```text
-~/Library/Application Support/codex-account-switcher/
-```
+The bridge listens on localhost and rejects cross-site control requests.
+The CDP debug connection grants powerful access to the running app, so local
+processes remain within the trust boundary. To end the debugging session, stop
+the bridge and quit Codex.
 
-Saved Codex account snapshots use the Codex++ account-switcher-compatible
-layout:
+| Location | Contents |
+| --- | --- |
+| `~/.codex/auth.json` | Active Codex authentication |
+| `~/.codex/auth_accounts/<name>.json` | Saved account snapshots |
+| `~/.codex/current_account` | Current account name |
+| `~/.codex/auth_accounts_usage.json` | Account usage cache |
+| `~/.codex/auth.account-switcher-backup-*.json` | Authentication backups created when clearing the active login |
+| `~/Library/Application Support/codex-account-switcher/` | Bridge logs, preferences, and runtime state |
 
-```text
-~/.codex/auth.json
-~/.codex/auth_accounts/<name>.json
-~/.codex/current_account
-~/.codex/auth_accounts_usage.json
-```
+The account layout is compatible with the Codex++ account switcher. See
+[SECURITY.md](SECURITY.md) and the
+[pre-publication security review](docs/security-review-2026-10-20.md) for details.
+Report vulnerabilities through
+[private vulnerability reporting](https://github.com/irons163/codex-desktop-switcher/security/advisories/new).
 
-## Build And Test
+## Build and test
+
+Development requires a Swift 6 toolchain with the macOS SDK and Node.js 22 or later.
 
 ```sh
-npm install
+git clone https://github.com/irons163/codex-desktop-switcher.git
+cd codex-desktop-switcher
+npm ci
 swift test
-swift build
 npm test
 npm run check
+swift build
 .build/debug/CodexAccountSwitcher --status-json
 ```
 
-Node tests are grouped by account runtime, asar assets, CDP targets and launch,
-bridge behavior, renderer source guardrails, and public export compatibility.
-Run one suite directly with `node --test test/<suite>.test.js`.
-
-To produce a double-clickable app bundle:
+Build and verify a local app bundle:
 
 ```sh
 scripts/package-app.sh
+scripts/verify-app.sh
 open dist/CodexAccountSwitcher.app
 ```
 
 Local packages use an ad-hoc signature. Set `TARGET_ARCH=arm64` or
-`TARGET_ARCH=x86_64` to select an architecture and run `scripts/verify-app.sh`
-to check the bundle, signature, and helper CLI. Set `CODE_SIGN_IDENTITY` to a
-Developer ID Application identity for a distribution signature.
+`TARGET_ARCH=x86_64` to choose an architecture. Set `CODE_SIGN_IDENTITY` to a
+Developer ID Application identity for a distribution signature. Verification
+executes the app, so run `scripts/verify-app.sh` on the matching architecture.
 
-## Releases
+Run a single Node test suite with `node --test test/<suite>.test.js`.
+CI tests and verifies packaged apps on native Apple Silicon and Intel runners,
+and scans the complete Git history for secrets.
 
-GitHub Actions follows the same native Apple Silicon / Intel build and
-Developer ID notarization flow as `codex-theme-switcher`. CI runs the Swift and
-Node tests, syntax checks, and packaged-app verification on both architectures.
-The release workflow uploads two signed, notarized DMGs, matching dSYM archives,
-and `SHA256SUMS` only after both builds succeed. It retries transient Apple
-ticket-delivery failures while keeping notarization and Gatekeeper checks
-mandatory.
+### Command line
+
+Use `.build/debug/CodexAccountSwitcher` with these options:
+
+| Option | Action |
+| --- | --- |
+| `--status-json` | Report app, bridge, and injection status as JSON |
+| `--launch` | Launch Codex and inject the account interface |
+| `--inject` | Attach to an existing Codex debugging session and inject the interface |
+| `--stop` | Stop the switcher bridge |
+
+Compatibility aliases remain available: `--install` maps to `--launch`,
+`--repair --quiet` maps to `--inject --quiet`, and `--uninstall` maps to `--stop`.
+
+## Release workflow
+
+The [Release workflow](.github/workflows/release.yml) follows the native Apple
+Silicon / Intel build and notarization approach used by
+[codex-theme-switcher](https://github.com/irons163/codex-theme-switcher).
+Both builds must pass tests, signature verification, Apple notarization,
+ticket validation, and Gatekeeper checks before the workflow uploads DMGs,
+dSYM archives, and `SHA256SUMS`, then publishes the draft release.
 
 Configure these secrets in the repository's `release-production` environment:
 
@@ -97,43 +160,23 @@ APPLE_API_ISSUER_ID
 APPLE_API_PRIVATE_KEY_BASE64
 ```
 
-Before releasing, update `CFBundleShortVersionString` and `CFBundleVersion` in
-`Packaging/Info.plist`, keep `package.json` and `package-lock.json` versions in
-sync, and add `docs/release-notes/v<VERSION>.md`. Commit and push those changes
-to `main`.
-
-Create a draft release at that commit, then dispatch the release workflow:
-
-```sh
-git tag v0.1.1
-git push origin v0.1.1
-gh release create v0.1.1 --verify-tag --draft \
-  --title 'Codex Account Switcher 0.1.1' \
-  --notes-file docs/release-notes/v0.1.1.md
-gh workflow run release.yml --ref main -f release_tag=v0.1.1
-```
-
-The workflow publishes the draft after uploading all verified assets. Publishing
-a release directly also triggers the workflow. To retry an existing release,
-dispatch `release.yml` with its `release_tag`; the workflow rebuilds the exact
-tagged commit and replaces the matching assets.
-
-## Commands
+For a new release, update `CFBundleShortVersionString` and increment
+`CFBundleVersion` in `Packaging/Info.plist`. Keep the versions in `package.json`
+and `package-lock.json` in sync, add `docs/release-notes/v<VERSION>.md`, and update
+the download links and instructions in both README versions. Commit and push
+to `main`. Then use a new, unused version tag; for example,
+after preparing version `0.1.2`:
 
 ```sh
-.build/debug/CodexAccountSwitcher --status-json
-.build/debug/CodexAccountSwitcher --launch
-.build/debug/CodexAccountSwitcher --inject
-.build/debug/CodexAccountSwitcher --stop
+VERSION=0.1.2
+git tag "v$VERSION"
+git push origin "v$VERSION"
+gh release create "v$VERSION" --verify-tag --draft \
+  --title "Codex Account Switcher $VERSION" \
+  --notes-file "docs/release-notes/v$VERSION.md"
+gh workflow run release.yml --ref main -f "release_tag=v$VERSION"
 ```
 
-Compatibility aliases are still accepted:
-
-```sh
-.build/debug/CodexAccountSwitcher --install
-.build/debug/CodexAccountSwitcher --repair --quiet
-.build/debug/CodexAccountSwitcher --uninstall
-```
-
-Those aliases now map to launch, inject, and stop. They do not mutate Codex.app,
-do not update asar integrity metadata, and do not re-sign the Codex bundle.
+Publishing a release directly also triggers the workflow. To retry, dispatch
+`release.yml` with the existing `release_tag`; it rebuilds the exact tagged
+commit and replaces the matching assets. Published tags should remain unchanged.
