@@ -6,10 +6,10 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { sleep } = require("./launcher");
 
-async function queryBridge(bridgePort, pathname = "/status", method = "GET") {
+async function queryBridge(bridgePort, pathname = "/status", method = "GET", timeoutMs = 5000) {
   const response = await fetch(`http://127.0.0.1:${bridgePort}${pathname}`, {
     method,
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const body = await response.text();
   let payload = null;

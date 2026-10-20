@@ -5,7 +5,8 @@ const fsSync = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
-const { close, listen } = require("./support/fixtures");
+const { spawn } = require("node:child_process");
+const { close, listen, withTempHome } = require("./support/fixtures");
 const {
   codexDebugArgs,
   codexProcessListHasMainCommand,
@@ -65,6 +66,50 @@ test("bridge query preserves JSON error messages from failed bridge requests", a
   } finally {
     await close(server);
   }
+});
+
+test("CLI launch waits for a Codex restart that takes longer than five seconds", async () => {
+  await withTempHome(async (home) => {
+    const codexApp = path.join(home, "Codex.app");
+    const executable = path.join(codexApp, "Contents", "MacOS", "Codex");
+    fsSync.mkdirSync(path.dirname(executable), { recursive: true });
+    fsSync.writeFileSync(executable, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    const status = { codexPath: codexApp, bridgeRunning: true, isInjected: true };
+    const server = http.createServer((request, response) => {
+      const reply = () => {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ app: "codex-account-switcher", ok: true, status }));
+      };
+      if (request.method === "POST" && request.url === "/launch") {
+        setTimeout(reply, 5500);
+      } else {
+        reply();
+      }
+    });
+    const port = await listen(server);
+    try {
+      const cli = path.join(__dirname, "..", "Sources", "CodexAccountSwitcher", "Resources", "cdp-helper", "cli.js");
+      const result = await new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [
+          cli, "launch", "--codex-app", codexApp, "--user-root", home,
+          "--debug-port", "57330", "--bridge-port", String(port),
+        ], { timeout: 15000 });
+        let stdout = "";
+        let stderr = "";
+        child.stdout.on("data", (data) => { stdout += data; });
+        child.stderr.on("data", (data) => { stderr += data; });
+        child.on("error", reject);
+        child.on("close", (code) => resolve({ code, stdout, stderr }));
+      });
+
+      assert.equal(result.code, 0, result.stdout + result.stderr);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.ok, true);
+      assert.equal(payload.status.isInjected, true);
+    } finally {
+      await close(server);
+    }
+  });
 });
 
 test("CLI launch path checks whether the default debug port already hosts Codex", () => {

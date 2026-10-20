@@ -30,7 +30,7 @@ async function main() {
     } else if (command === "launch" || command === "install") {
       resolved.debugPort = await launchDebugPort(resolved);
       await startBridgeDaemon({ ...resolved, autoLaunch: false });
-      const bridge = await queryBridge(resolved.bridgePort, "/launch", "POST");
+      const bridge = await queryBridge(resolved.bridgePort, "/launch", "POST", 60000);
       payload = await statusPayload(resolved, bridge);
     } else if (command === "inject" || command === "repair") {
       await startBridgeDaemon({ ...resolved, autoLaunch: false });
