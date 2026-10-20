@@ -105,12 +105,12 @@ to `main`.
 Create a draft release at that commit, then dispatch the release workflow:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
-gh release create v0.1.0 --verify-tag --draft \
-  --title 'Codex Account Switcher 0.1.0' \
-  --notes-file docs/release-notes/v0.1.0.md
-gh workflow run release.yml --ref main -f release_tag=v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
+gh release create v0.1.1 --verify-tag --draft \
+  --title 'Codex Account Switcher 0.1.1' \
+  --notes-file docs/release-notes/v0.1.1.md
+gh workflow run release.yml --ref main -f release_tag=v0.1.1
 ```
 
 The workflow publishes the draft after uploading all verified assets. Publishing
